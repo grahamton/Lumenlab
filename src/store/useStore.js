@@ -52,6 +52,8 @@ export const useStore = create((set) => ({
   tiling: {
     type: 'none', // 'none', 'p1', 'p2', 'p4m', 'p6m'
     scale: 1.0, // 0.1 - 2.0
+    overlap: 0.0, // 0.0 - 1.0 (Percentage of overlap)
+    feather: 0.0, // 0.0 - 1.0 (Edge softness)
   },
 
   // Actions
@@ -95,6 +97,6 @@ export const useStore = create((set) => ({
     masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false },
     feedback: { amount: 0 },
     recording: { isActive: false, progress: 0 },
-    tiling: { type: 'none', scale: 1.0 }
+    tiling: { type: 'none', scale: 1.0, overlap: 0.0, feather: 0.0 }
   })
 }))

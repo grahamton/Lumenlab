@@ -174,45 +174,115 @@ export function Canvas() {
       // offCtx is clear (new canvas)
 
       // We iterate and draw tiles
+      // We iterate and draw tiles
+
+      // CACHE: If feather > 0, we should pre-render the feathered unit cell to improve performance?
+      // For now, let's do it per tile or use a temp canvas for the unit cell.
+
+      let unitCellCanvas = null
+
+      if (tiling.feather > 0) {
+        const size = Math.min(canvas.width, canvas.height) // Base size for unit cell gen?
+        // To properly feather, we need the unit cell as an image.
+        // Let's create a temp canvas that contains the result of `drawActiveGeometry`
+        unitCellCanvas = document.createElement('canvas')
+        // Render at screen resolution for quality, or tile resolution?
+        // Let's match screen to be safe for now, though performance heavy.
+        unitCellCanvas.width = canvas.width
+        unitCellCanvas.height = canvas.height
+        const ucCtx = unitCellCanvas.getContext('2d')
+
+        // Draw Active geometry centered
+        ucCtx.translate(centerX, centerY)
+        // We need to undo the canvas translation if we want it centered in temp
+        // Actually drawActiveGeometry assumes (centerX, centerY) as origin.
+        // So we just call it on ucCtx.
+        // But wait, drawActiveGeometry sets its own transforms?
+        // No, it expects targetCtx to have default transform (identity). It does internal translates.
+        drawActiveGeometry(ucCtx)
+
+        // Apply Feather Mask
+        // Radial Gradient or Rect Gradient? p1 usually implies rectangular tile.
+        // But symmetry shapes are circular/wedge.
+        // "Perfect seamless duplication" for p1 usually means Rectangular Fade.
+
+        const f = tiling.feather * 0.5 // 0 to 0.5 radius
+        // We want to fade the edges of the TILE, not the screen.
+        // But the geometry is drawn "full screen".
+        // We need to adhere to the `tileSize`.
+        // This is tricky because `drawActiveGeometry` draws unbounded.
+
+        // Simplified Feather: Mask the Unit Cell to a Circle or Box based on tileSize?
+        // Let's try Radial since symmetry is radial.
+
+        ucCtx.globalCompositeOperation = 'destination-in'
+        const grad = ucCtx.createRadialGradient(centerX, centerY, tileSize * 0.5 * (1 - tiling.feather), centerX, centerY, tileSize * 0.5)
+        grad.addColorStop(0, 'rgba(0,0,0,1)')
+        grad.addColorStop(1, 'rgba(0,0,0,0)')
+
+        ucCtx.fillStyle = grad
+        ucCtx.fillRect(0, 0, unitCellCanvas.width, unitCellCanvas.height)
+
+        ucCtx.globalCompositeOperation = 'source-over'
+      }
+
       for (let row = -1; row < rows; row++) {
         for (let col = -1; col < cols; col++) {
           offCtx.save()
 
           const tx = col * tileSize
           const ty = row * tileSize
-          // We want to translate to the tile position
-          offCtx.translate(tx, ty)
-
-          // Wallpaper Group Logic (Transforms relative to Tile Center)
           const halfTile = tileSize / 2
 
+          // Center of the current tile
+          offCtx.translate(tx + halfTile, ty + halfTile)
+
+          // Wallpaper Group Logic
           if (tiling.type === 'p2') {
             if ((row + col) % 2 !== 0) {
-              offCtx.translate(halfTile, halfTile)
               offCtx.rotate(Math.PI)
-              offCtx.translate(-halfTile, -halfTile)
             }
           } else if (tiling.type === 'p4m') {
-            if (col % 2 !== 0) {
+            const isColOdd = col % 2 !== 0
+            const isRowOdd = row % 2 !== 0
+
+            // Move origin to corner for scaling? No, logic above was:
+            // if col%2!=0, translate(tileSize, 0) scale(-1, 1)
+            // relative to tx, ty (top left of tile)
+
+            // Let's revert to Top-Left logic for transforms if p4m
+            offCtx.translate(-halfTile, -halfTile) // Go back to top-left
+
+            if (isColOdd) {
               offCtx.translate(tileSize, 0)
               offCtx.scale(-1, 1)
             }
-            if (row % 2 !== 0) {
+            if (isRowOdd) {
               offCtx.translate(0, tileSize)
               offCtx.scale(1, -1)
             }
+
+            offCtx.translate(halfTile, halfTile) // Go back to center
           }
 
-          // Now draw the Unit Cell
-          // drawActiveGeometry draws centered at screen center (centerX, centerY).
-          // We want it centered at (halfTile, halfTile) of the current context.
+          // Apply Overlap (Scale the drawing, not the grid)
+          const scaleMult = 1.0 + tiling.overlap
+          offCtx.scale(scaleMult, scaleMult)
 
-          offCtx.translate(halfTile, halfTile)
-          const scaleFactor = tileSize / Math.min(canvas.width, canvas.height)
-          offCtx.scale(scaleFactor, scaleFactor)
+          // Draw Unit Cell
+          // We need to scale the "Screen Size" geometry down to "Tile Size"
+          const baseScale = tileSize / Math.min(canvas.width, canvas.height)
+          offCtx.scale(baseScale, baseScale)
+
+          // Move (0,0) to be the "Center" of the screen space for drawActiveGeometry
           offCtx.translate(-centerX, -centerY)
 
-          drawActiveGeometry(offCtx)
+          if (tiling.feather > 0 && unitCellCanvas) {
+            // Draw the pre-feathered image
+            offCtx.drawImage(unitCellCanvas, 0, 0)
+          } else {
+            drawActiveGeometry(offCtx)
+          }
 
           offCtx.restore()
         }

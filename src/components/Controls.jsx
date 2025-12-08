@@ -83,7 +83,11 @@ export function Controls() {
             ))}
           </div>
           {tiling.type !== 'none' && (
-            <ControlGroup label="Tile Scale" value={tiling.scale} min={0.1} max={2.0} step={0.1} onChange={(v) => setTiling('scale', v)} tooltip="Size of the repeating pattern." />
+            <>
+              <ControlGroup label="Tile Scale" value={tiling.scale} min={0.1} max={2.0} step={0.1} onChange={(v) => setTiling('scale', v)} tooltip="Size of the repeating pattern." />
+              <ControlGroup label="Overlap" value={tiling.overlap} min={0} max={1} step={0.05} onChange={(v) => setTiling('overlap', v)} tooltip="Draw tiles larger than the grid to overlap them." />
+              <ControlGroup label="Feather" value={tiling.feather} min={0} max={1} step={0.05} onChange={(v) => setTiling('feather', v)} tooltip="Softness of the tile edges for seamless blending." />
+            </>
           )}
         </div>
 
