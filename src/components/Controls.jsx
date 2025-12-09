@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import {
   Zap, Sliders, Layers, Move, Hexagon, Waves, Activity, FolderOpen,
   RefreshCw, Dices, ChevronDown, ChevronRight, Download, Save, Trash2, HelpCircle,
-  Camera, Play, Pause
+  Camera, Play, Pause, PanelLeftClose
 } from 'lucide-react'
 
 function ControlGroup({ label, value, min, max, step = 1, onChange, children }) {
@@ -159,12 +159,16 @@ export function Controls() {
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => toggleHelp(true)} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Help">
-            <HelpCircle size={16} />
+            <HelpCircle size={18} />
+          </button>
+          <div className="w-px h-4 bg-neutral-800 mx-1"></div>
+          <button onClick={() => toggleControls(false)} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Hide Controls (TAB)">
+            <PanelLeftClose size={18} />
           </button>
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
 
         {/* 1. Source */}
         <Section
