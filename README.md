@@ -47,4 +47,4 @@
 ---
 
 ## 📜 License
-MIT
+GNU GPLv3
