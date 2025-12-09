@@ -19,59 +19,52 @@ export const useStore = create((set) => ({
     slices: 6,
   },
 
-  // Warp State (Phase 2)
+  // Warp State (Distortion)
   warp: {
     type: 'none', // 'none', 'polar', 'log-polar'
   },
 
-  // Displacement State (Phase 2)
+  // Displacement State (Liquify)
   displacement: {
     amp: 0,
     freq: 10,
   },
 
-  // Masking State (Phase 3)
+  // Masking State (Vignette/Luma)
   masking: {
-    lumaThreshold: 0, // 0-100%
-    centerRadius: 0, // 0-100%
+    lumaThreshold: 0,
+    centerRadius: 0,
     invertLuma: false,
-    feather: 0.0, // 0.0 - 1.0 (Edge softness)
+    feather: 0.0,
   },
 
-  // Recording State (Phase 4)
-  recording: {
-    isActive: false,
-    progress: 0, // 0-100%
-  },
-
-  // Tiling State (Phase 5)
+  // Tiling State
   tiling: {
-    type: 'none', // 'none', 'p1', 'p2', 'p4m', 'p6m'
-    scale: 1.0, // 0.1 - 2.0
-    overlap: 0.0, // 0.0 - 1.0 (Percentage of overlap)
+    type: 'none', // 'none', 'p1', 'p2', 'p4m'
+    scale: 1.0,
+    overlap: 0.0,
   },
 
   // Math Seeds (Generative)
   generator: {
     type: 'none', // 'none', 'fibonacci', 'voronoi', 'grid'
-    // Parameters
-    param1: 50, // Count / Density
-    param2: 50, // Spread / Speed
-    param3: 50, // Detail / Thickness
+    param1: 50,
+    param2: 50,
+    param3: 50,
   },
 
-  // Phase 6: Alchemist's Lab
+  // Alchemist's Lab
   color: {
-    posterize: 256, // 2-256 (256 = off)
+    posterize: 256,
   },
   effects: {
-    edgeDetect: 0, // 0-100 (Intensity)
-    invert: 0,     // 0-100 (Intensity)
-    solarize: 0,   // 0-100 (Intensity)
-    shift: 0,      // 0-100 (Intensity)
+    edgeDetect: 0,
+    invert: 0,
+    solarize: 0,
+    shift: 0,
   },
 
-  // Phase 8: The Projectionist (Canvas Control)
+  // The Projectionist (Canvas Control)
   canvas: {
     width: 1920,
     height: 1080,
@@ -80,21 +73,37 @@ export const useStore = create((set) => ({
     shape: 'rectangle', // 'rectangle', 'circle'
   },
 
-  // Phase 7: The Director's Cut
+  // The Director's Cut
   snapshots: [],
   animation: {
     isPlaying: false,
-    duration: 3000, // ms per transition
-    mode: 'loop', // 'loop', 'pingpong'
+    duration: 3000,
+    mode: 'loop',
+    easing: 'linear',
+    holdTime: 0,
   },
+
+  // Flux State (Auto-Animation)
+  flux: {
+    enabled: false,
+  },
+
+  // UI State
+  ui: {
+    helpOpen: true,
+    controlsOpen: true,
+  },
+
+  toggleHelp: (isOpen) => set((state) => ({ ui: { ...state.ui, helpOpen: isOpen } })),
+  toggleControls: (isOpen) => set((state) => ({ ui: { ...state.ui, controlsOpen: isOpen } })),
+
+  recording: { isActive: false, progress: 0 },
 
   // Actions
   randomize: () => set((state) => {
-    // Helper for random range
     const rng = (min, max) => Math.random() * (max - min) + min
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
-    // Aesthetic Constraints
     const symmetrySlices = pick([4, 6, 8, 12, 16])
     const tilingType = Math.random() > 0.3 ? pick(['p1', 'p2', 'p4m']) : 'none'
     const warpType = Math.random() > 0.4 ? pick(['polar', 'log-polar']) : 'none'
@@ -110,11 +119,9 @@ export const useStore = create((set) => ({
         enabled: Math.random() > 0.3,
         slices: symmetrySlices,
       },
-      warp: {
-        type: warpType,
-      },
+      warp: { type: warpType },
       displacement: {
-        amp: Math.random() > 0.5 ? rng(0, 150) : 0, // Increased Max Amp
+        amp: Math.random() > 0.5 ? rng(0, 150) : 0,
         freq: rng(5, 50),
       },
       tiling: {
@@ -142,14 +149,11 @@ export const useStore = create((set) => ({
         param1: rng(10, 90),
         param2: rng(10, 90),
       },
-      canvas: {
-        ...state.canvas, // PROTECT CANVAS SETTINGS
-      }
+      // Keep canvas and ui state as is
     }
   }),
 
   addSnapshot: () => set((state) => {
-    // Capture current visual state
     const snap = {
       transforms: { ...state.transforms },
       symmetry: { ...state.symmetry },
@@ -159,7 +163,7 @@ export const useStore = create((set) => ({
       masking: { ...state.masking },
       color: { ...state.color },
       effects: { ...state.effects },
-      generator: { ...state.generator }, // Capture Generator State
+      generator: { ...state.generator },
       id: Date.now()
     }
     return { snapshots: [...state.snapshots, snap] }
@@ -205,8 +209,6 @@ export const useStore = create((set) => ({
     masking: { ...state.masking, [key]: value }
   })),
 
-  // Feedback Removed (Phase 4 Deprecated)
-
   setRecording: (key, value) => set((state) => ({
     recording: { ...state.recording, [key]: value }
   })),
@@ -237,12 +239,26 @@ export const useStore = create((set) => ({
     warp: { type: 'none' },
     displacement: { amp: 0, freq: 10 },
     masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false, feather: 0.0 },
-    // feedback: { amount: 0 }, // Removed
     recording: { isActive: false, progress: 0 },
     tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
     generator: { type: 'none', param1: 50, param2: 50, param3: 50 },
     color: { posterize: 256 },
     effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0 },
-    canvas: { ...state.canvas, width: 1920, height: 1080, aspect: 'video', fit: 'contain', shape: 'rectangle' }
+    // Keep canvas and ui state as is
+    flux: { enabled: true },
+    animation: { ...state.animation, isPlaying: false }
+  })),
+
+  setFlux: (key, value) => set((state) => ({
+    flux: { ...state.flux, [key]: value }
+  })),
+
+  // UI & Export
+  triggerExport: (req) => set((state) => ({
+    ui: { ...state.ui, exportRequest: req }
+  })),
+
+  toggleHelp: (val) => set((state) => ({
+    ui: { ...state.ui, helpOpen: val !== undefined ? val : !state.ui.helpOpen }
   }))
 }))

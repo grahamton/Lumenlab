@@ -1,0 +1,224 @@
+import React, { useRef, useMemo, useEffect } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
+import { useStore } from '../store/useStore'
+import vertShader from '../shaders/visualizer.vert?raw'
+import fragShader from '../shaders/visualizer.frag?raw'
+
+// The Inner Scene
+function VisualizerScene() {
+  const meshRef = useRef()
+  const image = useStore((state) => state.image)
+  const exportRequest = useStore((state) => state.ui.exportRequest)
+  const triggerExport = useStore((state) => state.triggerExport)
+  const fluxEnabled = useStore((state) => state.flux.enabled) // Flux subscription
+  const shape = useStore((state) => state.canvas.shape) // Subscribe to shape
+  const { gl, size } = useThree()
+  const timeRef = useRef(0) // Accumulate time manually
+  const imageAspect = useRef(1) // Track image aspect ratio
+
+  // Create Texture once
+  const texture = useMemo(() => {
+    const t = new THREE.Texture()
+    // Default black texture
+    t.image = new Image()
+    return t
+  }, [])
+
+  // Uniforms
+  const uniforms = useMemo(() => ({
+    uTexture: { value: texture },
+    uResolution: { value: new THREE.Vector2(size.width, size.height) },
+    uAspect: { value: size.width / size.height },
+    uImageAspect: { value: 1.0 }, // New: Image Aspect
+    uShape: { value: 0 }, // New: 0=Rect, 1=Circle
+    uTime: { value: 0 },
+    uTransforms: { value: new THREE.Vector4(0, 0, 1, 0) }, // x, y, scale, rotation
+    uSymEnabled: { value: false },
+    uSymSlices: { value: 6 },
+    uWarpType: { value: 0 }, // 0=none, 1=polar, 2=log
+    uDisplacement: { value: new THREE.Vector2(0, 10) },
+    uTilingType: { value: 0 }, // 0=none
+    uTilingScale: { value: 1 },
+    uPosterize: { value: 256 },
+    uEffects: { value: new THREE.Vector4(0, 0, 0, 0) }, // edge, invert, solarize, shift
+    uGenType: { value: 0 },
+    uGenParams: { value: new THREE.Vector3(50, 50, 50) }
+  }), []) // Empty deps, mutable
+
+  // Sync Texture when image changes
+  useEffect(() => {
+    if (image && image.complete) {
+      texture.image = image
+      texture.needsUpdate = true
+      // Update Aspect Ratio
+      if (image.naturalHeight > 0) {
+        imageAspect.current = image.naturalWidth / image.naturalHeight
+        uniforms.uImageAspect.value = imageAspect.current
+      }
+    }
+  }, [image, texture, uniforms])
+
+  // Resize Handler
+  useEffect(() => {
+    uniforms.uResolution.value.set(size.width, size.height)
+    uniforms.uAspect.value = size.width / size.height
+  }, [size, uniforms])
+
+  // Render Loop (60FPS)
+  useFrame((stateThree, delta) => {
+    const {
+      transforms, symmetry, warp, displacement, tiling,
+      color, effects, generator, animation
+    } = useStore.getState() // Access fresh state without re-render
+
+    // Flux Time Logic
+    if (fluxEnabled) {
+      timeRef.current += delta
+    }
+    uniforms.uTime.value = timeRef.current
+
+    // Update Shape Uniform
+    uniforms.uShape.value = shape === 'circle' ? 1 : 0
+
+    // Sync Uniforms
+    uniforms.uTransforms.value.set(
+      transforms.x,
+      transforms.y,
+      transforms.scale,
+      transforms.rotation
+    )
+
+    uniforms.uSymEnabled.value = symmetry.enabled
+    uniforms.uSymSlices.value = symmetry.slices
+
+    const warpMap = { 'none': 0, 'polar': 1, 'log-polar': 2 }
+    uniforms.uWarpType.value = warpMap[warp.type] || 0
+
+    uniforms.uDisplacement.value.set(displacement.amp, displacement.freq)
+
+    const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
+    uniforms.uTilingType.value = tileMap[tiling.type] || 0
+    uniforms.uTilingScale.value = tiling.scale
+
+    uniforms.uPosterize.value = color.posterize
+
+    uniforms.uEffects.value.set(
+      effects.edgeDetect,
+      effects.invert,
+      effects.solarize,
+      effects.shift
+    )
+
+    const genMap = { 'none': 0, 'fibonacci': 1, 'voronoi': 2, 'grid': 3 }
+    uniforms.uGenType.value = genMap[generator.type] || 0
+    uniforms.uGenType.value = genMap[generator.type] || 0
+    uniforms.uGenParams.value.set(generator.param1, generator.param2, generator.param3)
+  })
+
+  // Export Request Handler
+  useEffect(() => {
+    if (exportRequest) {
+      const { width, height, filename } = exportRequest
+
+      // Force refresh uniforms for export frame
+      const { transforms, symmetry, warp, displacement, tiling, color, effects, generator } = useStore.getState()
+      uniforms.uTransforms.value.set(transforms.x, transforms.y, transforms.scale, transforms.rotation)
+      uniforms.uSymEnabled.value = symmetry.enabled
+      uniforms.uSymSlices.value = symmetry.slices
+      const warpMap = { 'none': 0, 'polar': 1, 'log-polar': 2 }
+      uniforms.uWarpType.value = warpMap[warp.type] || 0
+      uniforms.uDisplacement.value.set(displacement.amp, displacement.freq)
+      const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
+      uniforms.uTilingType.value = tileMap[tiling.type] || 0
+      uniforms.uTilingScale.value = tiling.scale
+      uniforms.uPosterize.value = color.posterize
+      uniforms.uEffects.value.set(effects.edgeDetect, effects.invert, effects.solarize, effects.shift)
+      const genMap = { 'none': 0, 'fibonacci': 1, 'voronoi': 2, 'grid': 3 }
+      uniforms.uGenType.value = genMap[generator.type] || 0
+      uniforms.uGenParams.value.set(generator.param1, generator.param2, generator.param3)
+
+      // Resize
+      const originalSize = new THREE.Vector2()
+      gl.getSize(originalSize)
+      gl.setSize(width, height)
+      uniforms.uResolution.value.set(width, height)
+      uniforms.uAspect.value = width / height
+
+      // Render
+      gl.render(gl.scene, gl.camera)
+
+      // Capture
+      gl.domElement.toBlob((blob) => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+
+        // Reset
+        gl.setSize(originalSize.x, originalSize.y)
+        uniforms.uResolution.value.set(originalSize.x, originalSize.y)
+        uniforms.uAspect.value = originalSize.x / originalSize.y
+        triggerExport(null) // Clear request
+      }, 'image/png')
+    }
+  }, [exportRequest, gl, uniforms, triggerExport])
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[2, 2]} />
+      <shaderMaterial
+        vertexShader={vertShader}
+        fragmentShader={fragShader}
+        uniforms={uniforms}
+        transparent={true} // Needed for Portal/Circle Mask Alpha
+        depthWrite={false}
+        depthTest={false}
+      />
+    </mesh>
+  )
+}
+
+export function CanvasGL() {
+  const { canvas } = useStore()
+
+  // Calculate viewport style (Letterboxing)
+  // Re-use logic or simplify?
+  // Fiber handles resizing nicely if parent size is constrained.
+  // We can just set div size.
+
+  // Basic Aspect Ratio style
+  const style = useMemo(() => {
+    if (canvas.aspect === 'free') return { width: '100%', height: '100%' }
+
+    const targetAspect = canvas.width / canvas.height
+    const windowAspect = window.innerWidth / window.innerHeight
+
+    if (windowAspect > targetAspect) {
+      return { height: '100vh', width: `${100 * targetAspect / windowAspect}vw`, transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+    } else {
+      return { width: '100vw', height: `${100 * windowAspect / targetAspect}vh`, transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }
+    }
+  }, [canvas.width, canvas.height, canvas.aspect]) // Primitive check? width/height changes?
+
+  // Note: For perf, we might want to debounce resize calcs or just use strict CSS centered.
+
+  return (
+    <div className="w-full h-full bg-neutral-900 flex items-center justify-center overflow-hidden relative">
+      <div style={{ ...style, position: 'relative' }}>
+        <Canvas
+          gl={{
+            preserveDrawingBuffer: true, // Needed for Export
+            antialias: false,
+            powerPreference: "high-performance"
+          }}
+          camera={{ position: [0, 0, 1] }} // Dummy cam, shader uses raw coords
+        >
+          <VisualizerScene />
+        </Canvas>
+      </div>
+    </div>
+  )
+}

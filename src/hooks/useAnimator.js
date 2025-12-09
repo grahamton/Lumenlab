@@ -59,6 +59,23 @@ export function useAnimator() {
     }
   }
 
+  // Easing Functions
+  const easings = {
+    linear: t => t,
+    easeInOut: t => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+    elastic: t => {
+      const c4 = (2 * Math.PI) / 3
+      return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1
+    },
+    bounce: t => {
+      const n1 = 7.5625; const d1 = 2.75
+      if (t < 1 / d1) return n1 * t * t
+      else if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75
+      else if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375
+      else return n1 * (t -= 2.625 / d1) * t + 0.984375
+    }
+  }
+
   const animate = (time) => {
     if (!animation.isPlaying || snapshots.length < 2) {
       requestRef.current = requestAnimationFrame(animate)
@@ -67,7 +84,14 @@ export function useAnimator() {
 
     if (!startTimeRef.current) startTimeRef.current = time
     const elapsed = time - startTimeRef.current
-    const progress = Math.min(elapsed / animation.duration, 1)
+    const totalCycle = animation.duration + (animation.holdTime || 0)
+
+    // Calculate normalized progress (0-1) only during the "move" phase
+    let rawT = Math.min(elapsed / animation.duration, 1)
+
+    // Apply Easing
+    const easeFn = easings[animation.easing] || easings.linear
+    const progress = easeFn(rawT)
 
     // Interpolate
     const currIdx = currentIndexRef.current
@@ -76,10 +100,10 @@ export function useAnimator() {
     // Loop Logic
     if (nextIdx >= snapshots.length) {
       if (animation.mode === 'loop') nextIdx = 0
-      else { nextIdx = currIdx - 1; directionRef.current = -1 } // Ping-pong turn back
+      else { nextIdx = currIdx - 1; directionRef.current = -1 }
     } else if (nextIdx < 0) {
-      if (animation.mode === 'loop') nextIdx = snapshots.length - 1 // Should not happen in pure playback but logical safety
-      else { nextIdx = currIdx + 1; directionRef.current = 1 } // Ping-pong turn forward
+      if (animation.mode === 'loop') nextIdx = snapshots.length - 1
+      else { nextIdx = currIdx + 1; directionRef.current = 1 }
     }
 
     // Safety
@@ -89,12 +113,11 @@ export function useAnimator() {
     const currentState = interpolateState(snapshots[currIdx], snapshots[nextIdx], progress)
     loadSnapshot(currentState)
 
-    // Check for completion of this segment
-    if (progress >= 1) {
+    // Check for completion of Cycle (Move + Hold)
+    if (elapsed >= totalCycle) {
       startTimeRef.current = time
       currentIndexRef.current = nextIdx
 
-      // If Ping Pong, we need to check bounds again to potentially flip direction for next frame
       if (animation.mode === 'pingpong') {
         if (currentIndexRef.current >= snapshots.length - 1) directionRef.current = -1
         if (currentIndexRef.current <= 0) directionRef.current = 1
