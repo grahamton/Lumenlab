@@ -92,6 +92,7 @@ export const useStore = create((set) => ({
   ui: {
     helpOpen: true,
     controlsOpen: true,
+    advancedMode: false,
   },
 
   toggleControls: (isOpen) => set((state) => ({ ui: { ...state.ui, controlsOpen: isOpen } })),
@@ -232,7 +233,7 @@ export const useStore = create((set) => ({
     canvas: { ...state.canvas, [key]: value }
   })),
 
-  resetTransforms: () => set((state) => ({
+  resetState: () => set((state) => ({
     transforms: { x: 0, y: 0, scale: 1, rotation: 0 },
     symmetry: { enabled: false, slices: 6 },
     warp: { type: 'none' },
@@ -243,9 +244,8 @@ export const useStore = create((set) => ({
     generator: { type: 'none', param1: 50, param2: 50, param3: 50 },
     color: { posterize: 256 },
     effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0 },
-    // Keep canvas and ui state as is
-    flux: { enabled: true },
-    animation: { ...state.animation, isPlaying: false }
+    flux: { enabled: false },
+    animation: { ...state.animation, isPlaying: false, duration: 3000, mode: 'loop', easing: 'linear', holdTime: 0 }
   })),
 
   setFlux: (key, value) => set((state) => ({
