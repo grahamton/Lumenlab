@@ -62,6 +62,9 @@ export const useStore = create((set) => ({
     invert: 0,
     solarize: 0,
     shift: 0,
+    bloom: 0, // 0-1
+    chromaticAberration: 0, // 0-1
+    noise: 0, // 0-1
   },
 
   // The Projectionist (Canvas Control)

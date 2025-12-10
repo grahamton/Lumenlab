@@ -2,6 +2,8 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { EffectComposer, Bloom, Noise, ChromaticAberration } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 import { useStore } from '../store/useStore'
 import { useVideoRecorder } from '../hooks/useVideoRecorder'
 import { useAudioAnalyzer } from '../hooks/useAudioAnalyzer'
@@ -52,22 +54,23 @@ function VisualizerScene() {
     return t
   })
 
+  // ... (rest of uniforms initialization)
   const [uniforms] = useState(() => ({
     uTexture: { value: texture },
     uResolution: { value: new THREE.Vector2(size.width, size.height) },
     uAspect: { value: size.width / size.height },
-    uImageAspect: { value: 1.0 },
-    uShape: { value: 0 },
+    uImageAspect: { value: 1.0 }, // New: Image Aspect
+    uShape: { value: 0 }, // New: 0=Rect, 1=Circle
     uTime: { value: 0 },
-    uTransforms: { value: new THREE.Vector4(0, 0, 1, 0) },
+    uTransforms: { value: new THREE.Vector4(0, 0, 1, 0) }, // x, y, scale, rotation
     uSymEnabled: { value: false },
     uSymSlices: { value: 6 },
-    uWarpType: { value: 0 },
+    uWarpType: { value: 0 }, // 0=none, 1=polar, 2=log
     uDisplacement: { value: new THREE.Vector2(0, 10) },
-    uTilingType: { value: 0 },
+    uTilingType: { value: 0 }, // 0=none
     uTilingScale: { value: 1 },
     uPosterize: { value: 256 },
-    uEffects: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uEffects: { value: new THREE.Vector4(0, 0, 0, 0) }, // edge, invert, solarize, shift
     uGenType: { value: 0 },
     uGenParams: { value: new THREE.Vector3(50, 50, 50) },
     // Audio Uniforms
@@ -76,20 +79,47 @@ function VisualizerScene() {
     uAudioHigh: { value: 0 }
   }))
 
-  // ... (Texture & Resize UseEffects same as before)
+  // ... (rest of useEffects)
+  // Sync Texture when image changes
+  // Sync Texture when image changes
   useEffect(() => {
-    if (!image || !image.complete) return
-    texture.image = image
-    texture.needsUpdate = true
-    if (image.naturalHeight > 0) {
-      imageAspect.current = image.naturalWidth / image.naturalHeight
-      uniforms.uImageAspect.value = imageAspect.current
+    if (!image) return
+
+    const isVideo = image.tagName === 'VIDEO'
+    // For video, wait for readyState; for image, check complete
+    if (isVideo && image.readyState < 2) return
+    if (!isVideo && !image.complete) return
+
+    const uniformValues = uniforms
+    let finalTexture = texture
+
+    // If switching types, create new texture instance
+    if (isVideo && !(finalTexture instanceof THREE.VideoTexture)) {
+      finalTexture = new THREE.VideoTexture(image)
+      uniformValues.uTexture.value = finalTexture
+    } else if (!isVideo && (finalTexture instanceof THREE.VideoTexture)) {
+      finalTexture = new THREE.Texture(image)
+      uniformValues.uTexture.value = finalTexture
+    }
+
+    finalTexture.image = image
+    finalTexture.needsUpdate = true
+
+    // Update Aspect Ratio
+    let w = isVideo ? image.videoWidth : image.naturalWidth
+    let h = isVideo ? image.videoHeight : image.naturalHeight
+
+    if (h > 0) {
+      imageAspect.current = w / h
+      uniformValues.uImageAspect.value = imageAspect.current
     }
   }, [image, texture, uniforms])
 
+  // Resize Handler
   useEffect(() => {
-    uniforms.uResolution.value.set(size.width, size.height)
-    uniforms.uAspect.value = size.width / size.height
+    const uniformValues = uniforms
+    uniformValues.uResolution.value.set(size.width, size.height)
+    uniformValues.uAspect.value = size.width / size.height
   }, [size, uniforms])
 
   // Render Loop (60FPS)
@@ -98,9 +128,9 @@ function VisualizerScene() {
     const {
       transforms, symmetry, warp, displacement, tiling,
       color, effects, generator, audio: audioState
-    } = useStore.getState()
+    } = useStore.getState() // Access fresh state without re-render
 
-    // Time
+    // Flux Time Logic
     if (fluxEnabled) {
       timeRef.current += delta
     }
@@ -142,9 +172,7 @@ function VisualizerScene() {
     const warpMap = { 'none': 0, 'polar': 1, 'log-polar': 2 }
     uniformValues.uWarpType.value = warpMap[warp.type] || 0
 
-    // Displace amp can react to Mids
-    const reactiveAmp = displacement.amp + (mid * audioState.reactivity.mid * 50)
-    uniformValues.uDisplacement.value.set(reactiveAmp, displacement.freq)
+    uniformValues.uDisplacement.value.set(displacement.amp, displacement.freq)
 
     const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
     uniformValues.uTilingType.value = tileMap[tiling.type] || 0
@@ -234,6 +262,17 @@ function VisualizerScene() {
   )
 }
 
+function EffectsLayer() {
+  const { bloom, chromaticAberration, noise } = useStore((state) => state.effects)
+  return (
+    <EffectComposer>
+      {bloom > 0 && <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={bloom * 2} />}
+      {chromaticAberration > 0 && <ChromaticAberration offset={[chromaticAberration * 0.01, chromaticAberration * 0.01]} />}
+      {noise > 0 && <Noise opacity={noise} blendFunction={BlendFunction.OVERLAY} />}
+    </EffectComposer>
+  )
+}
+
 export function CanvasGL() {
   const { canvas } = useStore()
 
@@ -263,6 +302,7 @@ export function CanvasGL() {
           camera={{ position: [0, 0, 1] }}
         >
           <VisualizerScene />
+          <EffectsLayer />
         </Canvas>
       </div>
     </div>

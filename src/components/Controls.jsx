@@ -109,11 +109,27 @@ export function Controls() {
     try {
       e.target.value = null
       const reader = new FileReader()
+
       reader.onload = (event) => {
-        const img = new Image()
-        img.onload = () => setImage(img)
-        img.onerror = () => alert("Error loading image.")
-        img.src = event.target.result
+        const isVideo = file.type.startsWith('video/')
+
+        if (isVideo) {
+          const video = document.createElement('video')
+          video.src = event.target.result
+          video.loop = true
+          video.muted = true
+          video.autoplay = true
+          video.playsInline = true
+          // Wait for metadata to ensure we have dimensions
+          video.onloadedmetadata = () => {
+            video.play().then(() => setImage(video)).catch(err => console.error("Video play failed", err))
+          }
+        } else {
+          const img = new Image()
+          img.onload = () => setImage(img)
+          img.onerror = () => alert("Error loading image.")
+          img.src = event.target.result
+        }
       }
       reader.readAsDataURL(file)
     } catch (err) {
@@ -257,14 +273,14 @@ export function Controls() {
             <div className="space-y-2">
               <div className="relative group">
                 <div className="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="block w-full text-[10px] text-neutral-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-neutral-800 file:text-cyan-500 hover:file:bg-neutral-700 cursor-pointer" />
+                <input type="file" accept="image/*,video/*" onChange={handleImageUpload} className="block w-full text-[10px] text-neutral-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-neutral-800 file:text-cyan-500 hover:file:bg-neutral-700 cursor-pointer" />
               </div>
               <button onClick={loadDemoImage} className="text-xs w-full py-1.5 text-neutral-500 hover:text-neutral-300 transition-colors flex items-center gap-1 justify-center"><Zap size={10} /> Load Demo Image</button>
             </div>
           ) : (
             <div>
               <div className="grid grid-cols-3 gap-1 mb-3">
-                {['fibonacci', 'voronoi', 'grid'].map(t => (
+                {['fibonacci', 'voronoi', 'grid', 'liquid', 'plasma'].map(t => (
                   <button key={t} onClick={() => store.setGenerator('type', t)} className={`text-[10px] py-2 rounded capitalize border transition-all ${store.generator.type === t ? 'bg-cyan-900/30 text-cyan-200 border-cyan-800' : 'bg-neutral-800 text-neutral-500 border-transparent hover:border-neutral-700'}`}>{t}</button>
                 ))}
               </div>
@@ -281,6 +297,21 @@ export function Controls() {
                     <>
                       <ControlGroup label="Cells" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
                       <ControlGroup label="Bubble Size" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                    </>
+                  )}
+                  {store.generator.type === 'grid' && (
+                    <ControlGroup label="Grid Size" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                  )}
+                  {store.generator.type === 'liquid' && (
+                    <>
+                      <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                      <ControlGroup label="Flow Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                    </>
+                  )}
+                  {store.generator.type === 'plasma' && (
+                    <>
+                      <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                      <ControlGroup label="Flux Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
                     </>
                   )}
                   {store.generator.type === 'grid' && (
@@ -499,6 +530,13 @@ export function Controls() {
               <ControlGroup label="RGB Shift" value={effects.shift} min={0} max={100} onChange={(v) => setEffects('shift', v)} />
               <div className="mt-2">
                 <ControlGroup label={`Posterize (Levels: ${color.posterize < 256 ? color.posterize : 'Off'})`} value={color.posterize} min={2} max={256} onChange={(v) => setColor('posterize', v)} />
+              </div>
+
+              <div className="border-t border-neutral-800 my-2 pt-2">
+                <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Camera Effects (Post-Process)</span>
+                <ControlGroup label="Glow (Bloom)" value={effects.bloom || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('bloom', v)} />
+                <ControlGroup label="Glitch (Aberration)" value={effects.chromaticAberration || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('chromaticAberration', v)} />
+                <ControlGroup label="Film Grain (Noise)" value={effects.noise || 0} min={0} max={0.5} step={0.01} onChange={(v) => setEffects('noise', v)} />
               </div>
             </>
           )}

@@ -27,7 +27,7 @@ uniform float uPosterize;
 uniform vec4 uEffects; // edge, invert, solarize, shift
 
 // Generator
-uniform float uGenType; // 0=none, 1=fib, 2=voronoi, 3=grid
+uniform float uGenType; // 0=none, 1=fib, 2=voronoi, 3=grid, 4=liquid, 5=plasma
 uniform vec3 uGenParams; // p1, p2, p3
 
 #define PI 3.14159265359
@@ -74,6 +74,68 @@ vec3 basicGrid(vec2 uv) {
     float line = min(grid.x, grid.y);
     float val = 1.0 - min(line, 1.0);
     return vec3(val);
+}
+
+// Simplex 2D noise
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+float snoise(vec2 v){
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+           -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy) );
+  vec2 x0 = v -   i + dot(i, C.xx);
+  vec2 i1;
+  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+  + i.x + vec3(0.0, i1.x, 1.0 ));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+  m = m*m ;
+  m = m*m ;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+vec3 liquid(vec2 uv) {
+    vec2 st = uv * uGenParams.x * 0.05;
+    float n = snoise(st + uTime * uGenParams.y * 0.002); // Flow
+    // Layering
+    n += 0.5 * snoise(st * 2.0 - uTime * 0.2);
+    float val = smoothstep(0.2, 0.8, n + 0.5);
+    // Colorize
+    return vec3(
+        val * sin(uTime + n),
+        val * cos(uTime + n),
+        val
+    );
+}
+
+vec3 plasma(vec2 uv) {
+    vec2 st = uv * uGenParams.x * 0.1;
+    float v = 0.0;
+    v += sin((st.x + uTime * 0.5));
+    v += sin((st.y + uTime) / 2.0);
+    v += sin((st.x + st.y + uTime) / 2.0);
+    vec2 c = st + vec2(sin(uTime), cos(uTime));
+    v += sin(length(c) * (uGenParams.y * 0.1));
+
+    // Map -something to 0..1
+    v = v / 4.0;
+
+    return vec3(
+        0.5 + 0.5 * sin(PI * v + uTime),
+        0.5 + 0.5 * sin(PI * v + uTime + 2.0),
+        0.5 + 0.5 * sin(PI * v + uTime + 4.0)
+    );
 }
 
 // --- MAIN ---
@@ -150,60 +212,9 @@ void main() {
     // Restore UV to Texture Space (0-1)
 
     // IMAGE FIT: CONTAIN logic
-    // We have coord in "Canvas Aspect Space". We need to map to "Image Aspect Space".
-    // uAspect = Canvas Width / Canvas Height
-    // uImageAspect = Image Width / Image Height
-
-    // If we just divide by uAspect, we get back to 0-1 canvas space.
-    // We want to scale so the image 'fits' inside the canvas.
-
-    float scaleFactor = 1.0;
-    if (uAspect > uImageAspect) {
-        // Canvas is wider than image (or image is taller)
-        // We need to scale X to match height
-        // height matches (1.0). width needs to be wider in UV space (to sample smaller part of texture? no wait.)
-        // To FIT, we map 0-1 image to center of canvas.
-        // Actually simplest is:
-        coord.x /= uImageAspect; // Now both are "height-normalized" ???
-
-         // Let's try standard approach:
-         // 1. Convert back to normalized Square (-0.5 to 0.5) relative to IMAGE
-         // Current: X is scaled by uAspect. Y is 1.0.
-
-         // undo Aspect correction first?
-         // coord.x /= uAspect;
-         // Now we are in 0..1 canvas pixels normalized.
-
-         // To sample texture:
-         // texture.x = coord.x * (CanvasAspect / ImageAspect) ?
-    }
-
-    // Robust "Contain" Mapping:
-    // We want 0,0 at center.
-    // If uAspect > uImageAspect (Canvas wider):
-    //   Image should touch top/bottom. Sides empty.
-    //   coord.y is already correct (-0.5 to 0.5 range covers full height)
-    //   coord.x covers (-uAspect/2 to uAspect/2).
-    //   We want image to cover (-uImageAspect/2 to uImageAspect/2).
-    //   So UV.x = coord.x / uImageAspect + 0.5
-
-    // If uAspect < uImageAspect (Canvas taller):
-    //   Image should touch sides. Top/bottom empty.
-    //   coord.x covers full width? No, coord.x was multiplied by uAspect.
-    //   Wait, earlier: coord.x *= uAspect.
-    //   So coord.y is [-0.5, 0.5]
-    //   coord.x is [-uAspect/2, uAspect/2]
-
     if (uAspect > uImageAspect) {
         coord.x /= uImageAspect; // Scale X to be relative to Image Height
-        // coord.y is already relative to Image Height (since fit to height)
     } else {
-        // Fit to Width
-        // we want X to go from 0 to 1.
-        // Currently X is [-uAspect/2, uAspect/2].
-        // We want that range to map to... 0 to 1? NO.
-        // If canvas is taller, the image fills the width.
-        // So [-uAspect/2, uAspect/2] corresponds to [0, 1] texture.
         coord.x /= uAspect; // Back to 1.0 range
         coord.y *= (uAspect / uImageAspect); // Scale Y
     }
@@ -213,18 +224,15 @@ void main() {
     // 7. Sample Texture or Generator
     vec4 texColor = vec4(0.0);
 
-    // Check Bounds for Texture (Clamp to border / transparency)
-    // Only if not tiling? No, transforms might push it out.
-    // For "Contain", we want transparent borders if out of bounds.
-    // unless generator is active.
-
     bool inBounds = (coord.x >= 0.0 && coord.x <= 1.0 && coord.y >= 0.0 && coord.y <= 1.0);
 
     if (uGenType > 0.5) {
         vec3 gen = vec3(0.0);
         if (uGenType < 1.5) gen = fibonacciSpiral(coord);
         else if (uGenType < 2.5) gen = voronoi(coord);
-        else gen = basicGrid(coord);
+        else if (uGenType < 3.5) gen = basicGrid(coord);
+        else if (uGenType < 4.5) gen = liquid(coord);
+        else gen = plasma(coord);
         texColor = vec4(gen, 1.0);
     } else {
         if (inBounds) {
@@ -258,8 +266,6 @@ void main() {
         float b = 0.0;
 
         // Simple shift needs bound check too or clamp
-        vec2 shiftCoords = coord;
-
         if (inBounds) {
              r = texture2D(uTexture, coord - vec2(shift, 0.0)).r;
              b = texture2D(uTexture, coord + vec2(shift, 0.0)).b;
@@ -277,16 +283,12 @@ void main() {
     vec4 finalColor = vec4(color, texColor.a);
 
     // 9. Shape Mask (Circle)
-    // Mask based on ORIGINAL SCREEN UV (vUv), not transformed texture UV.
-    // Center is 0.5, 0.5
     if (uShape > 0.5) {
         vec2 center = vec2(0.5);
         vec2 distVec = vUv - center;
         distVec.x *= uAspect; // Correct for canvas aspect to get perfect circle
         float dist = length(distVec);
 
-        // Radius 0.5 (diameter 1.0 height)
-        // Soft edge (AA)
         float alpha = 1.0 - smoothstep(0.495, 0.505, dist);
         finalColor.a *= alpha;
     }
