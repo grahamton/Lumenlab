@@ -22,8 +22,14 @@
 -   **Universal Input**: Drag & drop Images or Video (`.mp4`) files.
 -   **Audio Reactivity**: Visuals pulse and shift to your microphone or music input.
 -   **Generative Engines**: Built-in mathematical generators like Fibonacci, Voronoi, Liquid, and Plasma.
--   **Post-Processing**: Professional grade effects including Bloom (Glow), Glitch, and Film Grain.
--   **Capture**: Record your sessions to `.webm` or take high-res Snapshots.
+-   **Pro Effects Stack**: Bloom, Chromatic Aberration, Noise, and Color Grading.
+-   **Preset Manager**: Save your own custom configurations or choose from 10+ built-in styles.
+-   **Autosave**: Never lose your flow—the app remembers exactly where you left off.
+-   **Capture**: Record sessions to `.webm` or take 4K Snapshots.
+
+## 🖼️ Gallery
+*(Screenshots coming soon!)*
+> **Tip:** Press `S` to take a snapshot of your creation!
 
 ---
 

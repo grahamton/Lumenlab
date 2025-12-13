@@ -33,6 +33,10 @@ function ControlGroup({ label, value, min, max, step = 1, onChange, children, is
 
 export function Controls() {
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [uiPresetTab, setUiPresetTab] = useState('default')
+  const [isCreatingPreset, setIsCreatingPreset] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
+
   const store = useStore()
   const {
     ui, toggleControls,
@@ -217,12 +221,12 @@ export function Controls() {
           <h1 className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">Lumen Lab</h1>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => useStore.setState(state => ({ ui: { ...state.ui, advancedMode: !state.ui.advancedMode } }))}
-            className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded border transition-all ${ui.advancedMode ? 'bg-cyan-900/30 text-cyan-400 border-cyan-800' : 'bg-transparent text-neutral-500 border-neutral-800 hover:border-neutral-600'}`}
-            title="Toggle Advanced Controls"
-          >
-            {ui.advancedMode ? 'Adv On' : 'Adv Off'}
+
+          <button onClick={() => store.randomize()} className="p-1.5 text-neutral-400 hover:text-cyan-400 rounded-md hover:bg-neutral-800 transition-colors" title="Randomize Parameters">
+            <Dices size={18} />
+          </button>
+          <button onClick={() => { if (confirm('Reset to default?')) resetState() }} className="p-1.5 text-neutral-400 hover:text-red-400 rounded-md hover:bg-neutral-800 transition-colors" title="Reset All">
+            <RefreshCw size={18} />
           </button>
           <div className="w-px h-4 bg-neutral-800 mx-1"></div>
           <button onClick={() => toggleHelp(true)} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Help">
@@ -252,21 +256,95 @@ export function Controls() {
             <button onClick={() => store.setGenerator('type', 'fibonacci')} className={`text-xs flex-1 py-1.5 rounded-md transition-all font-medium ${store.generator.type !== 'none' ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}>Math (Gen)</button>
           </div>
 
-          {/* Preset Loader */}
-          <div className="mb-3">
-            <select
-              className="w-full bg-neutral-800 text-[10px] text-neutral-400 p-1.5 rounded border border-neutral-700 outline-none hover:border-neutral-500 transition-colors"
-              onChange={(e) => {
-                const idx = e.target.value
-                if (idx !== "") {
-                  useStore.setState(presets[idx].state)
-                }
-              }}
-              defaultValue=""
-            >
-              <option value="" disabled>Load Preset...</option>
-              {presets.map((p, i) => <option key={i} value={i}>{p.name}</option>)}
-            </select>
+          {/* Preset Manager */}
+          <div className="mb-3 bg-neutral-800/50 rounded-lg p-2 border border-neutral-800">
+            <div className="flex gap-2 mb-2 p-0.5 bg-neutral-900 rounded">
+              <button onClick={() => setUiPresetTab('default')} className={`flex-1 py-1 text-[10px] rounded transition-colors ${uiPresetTab === 'default' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>Built-in</button>
+              <button onClick={() => setUiPresetTab('user')} className={`flex-1 py-1 text-[10px] rounded transition-colors ${uiPresetTab === 'user' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>My Presets</button>
+            </div>
+
+            {uiPresetTab === 'default' ? (
+              <div className="space-y-1">
+                {presets.map((p, i) => (
+                  <button
+                    key={i}
+                    onClick={() => useStore.setState(p.state)}
+                    className="w-full text-left text-[10px] text-neutral-400 hover:text-cyan-400 hover:bg-neutral-800 px-2 py-1.5 rounded transition-colors flex items-center justify-between group"
+                  >
+                    {p.name}
+                    <ChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {!isCreatingPreset ? (
+                  <button
+                    onClick={() => setIsCreatingPreset(true)}
+                    className="w-full bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-800/50 py-1.5 rounded text-[10px] flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Save size={10} /> Save Current State
+                  </button>
+                ) : (
+                  <div className="bg-neutral-900 p-2 rounded border border-neutral-700 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Preset Name..."
+                      className="w-full bg-neutral-800 text-white text-[10px] p-1.5 rounded border border-neutral-600 outline-none focus:border-cyan-500 transition-colors"
+                      value={newPresetName}
+                      onChange={(e) => setNewPresetName(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newPresetName.trim()) {
+                          store.saveUserPreset(newPresetName.trim())
+                          setNewPresetName('')
+                          setIsCreatingPreset(false)
+                        }
+                        if (e.key === 'Escape') setIsCreatingPreset(false)
+                      }}
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          if (newPresetName.trim()) {
+                            store.saveUserPreset(newPresetName.trim())
+                            setNewPresetName('')
+                            setIsCreatingPreset(false)
+                          }
+                        }}
+                        disabled={!newPresetName.trim()}
+                        className="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white py-1 rounded text-[10px] disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setIsCreatingPreset(false)}
+                        className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-neutral-300 py-1 rounded text-[10px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                  {store.userPresets && store.userPresets.length > 0 ? (
+                    store.userPresets.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between bg-neutral-900/50 p-1.5 rounded text-[10px] group border border-transparent hover:border-neutral-700">
+                        <button onClick={() => useStore.setState(p.state)} className="flex-1 text-left truncate text-neutral-300 hover:text-white mr-2">
+                          {p.name}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete preset?')) store.deleteUserPreset(p.id) }} className="text-neutral-600 hover:text-red-400 p-1 rounded hover:bg-neutral-800">
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-[10px] text-neutral-600 text-center py-2 italic">No saved presets</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {store.generator.type === 'none' ? (
@@ -284,44 +362,40 @@ export function Controls() {
                   <button key={t} onClick={() => store.setGenerator('type', t)} className={`text-[10px] py-2 rounded capitalize border transition-all ${store.generator.type === t ? 'bg-cyan-900/30 text-cyan-200 border-cyan-800' : 'bg-neutral-800 text-neutral-500 border-transparent hover:border-neutral-700'}`}>{t}</button>
                 ))}
               </div>
-              {ui.advancedMode && (
-                <div className="bg-neutral-800/30 p-2 rounded border border-neutral-800 space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-1"><Sliders size={10} /> Tuning</div>
-                  {store.generator.type === 'fibonacci' && (
-                    <>
-                      <ControlGroup label="Density" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                      <ControlGroup label="Zoom" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    </>
-                  )}
-                  {store.generator.type === 'voronoi' && (
-                    <>
-                      <ControlGroup label="Cells" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                      <ControlGroup label="Bubble Size" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    </>
-                  )}
-                  {store.generator.type === 'grid' && (
-                    <ControlGroup label="Grid Size" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                  )}
-                  {store.generator.type === 'liquid' && (
-                    <>
-                      <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                      <ControlGroup label="Flow Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    </>
-                  )}
-                  {store.generator.type === 'plasma' && (
-                    <>
-                      <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                      <ControlGroup label="Flux Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    </>
-                  )}
-                  {store.generator.type === 'grid' && (
-                    <>
-                      <ControlGroup label="Spacing" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                      <ControlGroup label="Thickness" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    </>
-                  )}
-                </div>
-              )}
+              <div className="bg-neutral-800/30 p-2 rounded border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-1"><Sliders size={10} /> Tuning</div>
+                {store.generator.type === 'fibonacci' && (
+                  <>
+                    <ControlGroup label="Density" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                    <ControlGroup label="Zoom" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                  </>
+                )}
+                {store.generator.type === 'voronoi' && (
+                  <>
+                    <ControlGroup label="Cells" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                    <ControlGroup label="Bubble Size" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                  </>
+                )}
+                {store.generator.type === 'liquid' && (
+                  <>
+                    <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                    <ControlGroup label="Flow Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                  </>
+                )}
+                {store.generator.type === 'plasma' && (
+                  <>
+                    <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                    <ControlGroup label="Flux Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                  </>
+                )}
+                {store.generator.type === 'grid' && (
+                  <>
+                    <ControlGroup label="Spacing" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+                    <ControlGroup label="Thickness" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+                    <ControlGroup label="Blur / Blend" value={store.generator.param3} min={1} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+                  </>
+                )}
+              </div>
             </div>
           )}
         </Section>
@@ -345,7 +419,7 @@ export function Controls() {
                 <button onClick={() => setSymmetry('enabled', true)} className={`px-2 py-0.5 rounded text-[10px] ${symmetry.enabled ? 'bg-cyan-600 text-white' : 'text-neutral-500'}`}>On</button>
               </div>
             </div>
-            {symmetry.enabled && ui.advancedMode && (
+            {symmetry.enabled && (
               <ControlGroup label="Slices" value={symmetry.slices} min={2} max={32} step={2} onChange={(v) => setSymmetry('slices', v)} />
             )}
           </div>
@@ -363,32 +437,31 @@ export function Controls() {
                 )
               })}
             </div>
-            {tiling.type !== 'none' && ui.advancedMode && (
+            {tiling.type !== 'none' && (
               <ControlGroup label="Grid Scale" value={tiling.scale} min={0.1} max={2.0} step={0.01} onChange={(v) => setTiling('scale', v)} />
             )}
           </div>
 
           {/* Distortion / Warp */}
-          {ui.advancedMode && (
-            <div className="border-t border-neutral-800 my-2 pt-2">
-              <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Distortion</span>
-              <div className="flex gap-1 mb-2">
-                {[{ id: 'none', label: 'None' }, { id: 'polar', label: 'Tunnel' }, { id: 'log-polar', label: 'Vortex' }].map((opt) => (
-                  <button key={opt.id} onClick={() => setWarp('type', opt.id)} className={`text-[10px] py-1 px-2 rounded capitalize flex-1 ${warp.type === opt.id ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}>{opt.label}</button>
-                ))}
-              </div>
-              <ControlGroup
-                label="Liquefy Strength"
-                value={Math.round(Math.sqrt(displacement.amp / 200) * 100)}
-                min={0}
-                max={100}
-                onChange={(v) => {
-                  const curved = (v / 100) * (v / 100) * 200;
-                  setDisplacement('amp', curved);
-                }}
-              />
+          {/* Distortion / Warp */}
+          <div className="border-t border-neutral-800 my-2 pt-2">
+            <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Distortion</span>
+            <div className="flex gap-1 mb-2">
+              {[{ id: 'none', label: 'None' }, { id: 'polar', label: 'Tunnel' }, { id: 'log-polar', label: 'Vortex' }].map((opt) => (
+                <button key={opt.id} onClick={() => setWarp('type', opt.id)} className={`text-[10px] py-1 px-2 rounded capitalize flex-1 ${warp.type === opt.id ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}>{opt.label}</button>
+              ))}
             </div>
-          )}
+            <ControlGroup
+              label="Liquefy Strength"
+              value={Math.round(Math.sqrt(displacement.amp / 400) * 100)}
+              min={0}
+              max={100}
+              onChange={(v) => {
+                const curved = (v / 100) * (v / 100) * 400; // Increased range from 200 to 400
+                setDisplacement('amp', curved);
+              }}
+            />
+          </div>
         </Section>
 
         {/* 3. Animation */}
@@ -450,29 +523,25 @@ export function Controls() {
 
           <div className="bg-neutral-800/50 p-2 rounded-lg">
             <ControlGroup isCore={true} label="Morph Speed (ms)" value={animation.duration} min={500} max={10000} step={100} onChange={(v) => setAnimation('duration', v)} />
-            {ui.advancedMode && (
-              <>
-                <ControlGroup label="Hold Time (ms)" value={animation.holdTime || 0} min={0} max={5000} step={100} onChange={(v) => setAnimation('holdTime', v)} />
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-neutral-400">Easing</span>
-                    <select value={animation.easing || 'linear'} onChange={(e) => setAnimation('easing', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
-                      <option value="linear">Linear</option>
-                      <option value="easeInOut">Smooth</option>
-                      <option value="elastic">Elastic</option>
-                      <option value="bounce">Bounce</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-neutral-400">Loop Mode</span>
-                    <select value={animation.mode} onChange={(e) => setAnimation('mode', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
-                      <option value="loop">Loop</option>
-                      <option value="pingpong">Ping Pong</option>
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
+            <ControlGroup label="Hold Time (ms)" value={animation.holdTime || 0} min={0} max={5000} step={100} onChange={(v) => setAnimation('holdTime', v)} />
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-neutral-400">Easing</span>
+                <select value={animation.easing || 'linear'} onChange={(e) => setAnimation('easing', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
+                  <option value="linear">Linear</option>
+                  <option value="easeInOut">Smooth</option>
+                  <option value="elastic">Elastic</option>
+                  <option value="bounce">Bounce</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-neutral-400">Loop Mode</span>
+                <select value={animation.mode} onChange={(e) => setAnimation('mode', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
+                  <option value="loop">Loop</option>
+                  <option value="pingpong">Ping Pong</option>
+                </select>
+              </div>
+            </div>
           </div>
         </Section>
 
@@ -523,23 +592,19 @@ export function Controls() {
           tooltip="Post-processing effects, Color grading, and Alchemy."
         >
           <ControlGroup isCore={true} label="Invert" value={effects.invert} min={0} max={100} onChange={(v) => setEffects('invert', v)} />
-          {ui.advancedMode && (
-            <>
-              <ControlGroup label="Neon Edge" value={effects.edgeDetect} min={0} max={100} onChange={(v) => setEffects('edgeDetect', v)} />
-              <ControlGroup label="Solarize" value={effects.solarize} min={0} max={100} onChange={(v) => setEffects('solarize', v)} />
-              <ControlGroup label="RGB Shift" value={effects.shift} min={0} max={100} onChange={(v) => setEffects('shift', v)} />
-              <div className="mt-2">
-                <ControlGroup label={`Posterize (Levels: ${color.posterize < 256 ? color.posterize : 'Off'})`} value={color.posterize} min={2} max={256} onChange={(v) => setColor('posterize', v)} />
-              </div>
+          <ControlGroup label="Neon Edge" value={effects.edgeDetect} min={0} max={100} onChange={(v) => setEffects('edgeDetect', v)} />
+          <ControlGroup label="Solarize" value={effects.solarize} min={0} max={100} onChange={(v) => setEffects('solarize', v)} />
+          <ControlGroup label="RGB Shift" value={effects.shift} min={0} max={100} onChange={(v) => setEffects('shift', v)} />
+          <div className="mt-2">
+            <ControlGroup label={`Posterize (Levels: ${color.posterize < 256 ? color.posterize : 'Off'})`} value={color.posterize} min={2} max={256} onChange={(v) => setColor('posterize', v)} />
+          </div>
 
-              <div className="border-t border-neutral-800 my-2 pt-2">
-                <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Camera Effects (Post-Process)</span>
-                <ControlGroup label="Glow (Bloom)" value={effects.bloom || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('bloom', v)} />
-                <ControlGroup label="Glitch (Aberration)" value={effects.chromaticAberration || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('chromaticAberration', v)} />
-                <ControlGroup label="Film Grain (Noise)" value={effects.noise || 0} min={0} max={0.5} step={0.01} onChange={(v) => setEffects('noise', v)} />
-              </div>
-            </>
-          )}
+          <div className="border-t border-neutral-800 my-2 pt-2">
+            <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Camera Effects (Post-Process)</span>
+            <ControlGroup label="Glow (Bloom)" value={effects.bloom || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('bloom', v)} />
+            <ControlGroup label="Glitch (Aberration)" value={effects.chromaticAberration || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('chromaticAberration', v)} />
+            <ControlGroup label="Film Grain (Noise)" value={effects.noise || 0} min={0} max={0.5} step={0.01} onChange={(v) => setEffects('noise', v)} />
+          </div>
         </Section>
 
         {/* 5. Output & View */}

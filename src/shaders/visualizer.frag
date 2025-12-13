@@ -69,11 +69,26 @@ vec3 voronoi(vec2 uv) {
 }
 
 vec3 basicGrid(vec2 uv) {
-    vec2 st = uv * uGenParams.x * 0.2;
-    vec2 grid = abs(fract(st - 0.5) - 0.5) / fwidth(st);
-    float line = min(grid.x, grid.y);
-    float val = 1.0 - min(line, 1.0);
-    return vec3(val);
+    vec2 st = uv * uGenParams.x * 0.2; // Scale
+
+    // Thickness (Parameter 2: 1-100 -> 0.005-0.5)
+    float thick = uGenParams.y * 0.005;
+
+    // Softness (Parameter 3: 1-100 -> 0.001-0.2)
+    // We add a small base softness to avoid hard aliasing if 0
+    float soft = uGenParams.z * 0.002 + 0.001;
+
+    // Distance from grid line (0.0 at line center, 0.5 at tile center)
+    vec2 grid = abs(fract(st - 0.5) - 0.5);
+
+    // Smoothstep for anti-aliased/soft line
+    // If distance < thick, we want 1.0 (inverted later).
+    // smoothstep returns 0.0 if x < edge0
+    float lineX = smoothstep(thick - soft, thick + soft, grid.x);
+    float lineY = smoothstep(thick - soft, thick + soft, grid.y);
+
+    // Combine axes (Union) and Invert so Line is White (1.0)
+    return vec3(1.0 - min(lineX, lineY));
 }
 
 // Simplex 2D noise
@@ -138,17 +153,35 @@ vec3 plasma(vec2 uv) {
     );
 }
 
+// --- CONTENT FETCHER ---
+vec4 getContent(vec2 uv) {
+    if (uGenType > 0.5) {
+        vec3 gen = vec3(0.0);
+        if (uGenType < 1.5) gen = fibonacciSpiral(uv);
+        else if (uGenType < 2.5) gen = voronoi(uv);
+        else if (uGenType < 3.5) gen = basicGrid(uv);
+        else if (uGenType < 4.5) gen = liquid(uv);
+        else gen = plasma(uv);
+        return vec4(gen, 1.0);
+    } else {
+        // Bounds check inside fetcher
+        if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+             return texture2D(uTexture, uv);
+        } else {
+             return vec4(0.0, 0.0, 0.0, 0.0);
+        }
+    }
+}
+
 // --- MAIN ---
 void main() {
     vec2 uv = vUv;
 
-    // 0. Generator Background (if no texture)
-    vec4 baseColor = vec4(0.0, 0.0, 0.0, 1.0);
-
     // 1. Tiling Logic (Modify UVs first)
+    // ... (Keep existing tiling logic structure, just abstracting sampling)
+    vec2 tileUV = uv;
     if (uTilingType > 0.5) {
-        vec2 tileUV = uv * uTilingScale;
-
+        tileUV = uv * uTilingScale;
         if (uTilingType > 2.5) { // p4m Mirror
              vec2 grid = fract(tileUV);
              if (mod(floor(tileUV.x), 2.0) == 1.0) grid.x = 1.0 - grid.x;
@@ -157,7 +190,7 @@ void main() {
         } else {
              tileUV = fract(tileUV);
         }
-        uv = tileUV;
+        uv = tileUV; // Update the working UV
     }
 
     // 2. Coordinates centering
@@ -221,30 +254,21 @@ void main() {
 
     coord += center; // Back to 0..1
 
-    // 7. Sample Texture or Generator
-    vec4 texColor = vec4(0.0);
-
-    bool inBounds = (coord.x >= 0.0 && coord.x <= 1.0 && coord.y >= 0.0 && coord.y <= 1.0);
-
-    if (uGenType > 0.5) {
-        vec3 gen = vec3(0.0);
-        if (uGenType < 1.5) gen = fibonacciSpiral(coord);
-        else if (uGenType < 2.5) gen = voronoi(coord);
-        else if (uGenType < 3.5) gen = basicGrid(coord);
-        else if (uGenType < 4.5) gen = liquid(coord);
-        else gen = plasma(coord);
-        texColor = vec4(gen, 1.0);
-    } else {
-        if (inBounds) {
-             texColor = texture2D(uTexture, coord);
-        } else {
-             // Border color (or transparent)
-             texColor = vec4(0.0, 0.0, 0.0, 0.0);
-        }
-    }
+    // 7. Sample Content (Base)
+    vec4 texColor = getContent(coord);
+    vec3 color = texColor.rgb;
 
     // 8. Effects
-    vec3 color = texColor.rgb;
+
+    // Shift (NOW WORKS ON EVERYTHING)
+    if (uEffects.w > 0.0) {
+        float shiftValue = uEffects.w * 0.01;
+        // We re-sample the CONTENT function, not the texture directly
+        float r = getContent(coord - vec2(shiftValue, 0.0)).r;
+        float b = getContent(coord + vec2(shiftValue, 0.0)).b;
+        color.r = r;
+        color.b = b;
+    }
 
     // Invert
     if (uEffects.y > 0.0) {
@@ -257,21 +281,6 @@ void main() {
         vec3 sol = color;
         if (luma > 0.5) sol = 1.0 - color;
         color = mix(color, sol, uEffects.z * 0.01);
-    }
-
-    // Shift
-    if (uEffects.w > 0.0) {
-        float shift = uEffects.w * 0.01;
-        float r = 0.0;
-        float b = 0.0;
-
-        // Simple shift needs bound check too or clamp
-        if (inBounds) {
-             r = texture2D(uTexture, coord - vec2(shift, 0.0)).r;
-             b = texture2D(uTexture, coord + vec2(shift, 0.0)).b;
-             color.r = r;
-             color.b = b;
-        }
     }
 
     // Posterize
