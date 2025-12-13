@@ -34,9 +34,34 @@ function App() {
     midiManager.init()
 
     const handleKeyDown = (e) => {
-      if (e.key === 'Tab') {
-        e.preventDefault()
-        useStore.getState().toggleControls(!useStore.getState().ui.controlsOpen)
+      // Ignore if typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      const store = useStore.getState()
+
+      switch (e.key.toLowerCase()) {
+        case 'tab':
+          e.preventDefault()
+          store.toggleControls(!store.ui.controlsOpen)
+          break
+        case 's':
+          store.addSnapshot()
+          // Visual feedback could be added here
+          break
+        case 'r':
+          // Toggle Recording
+          store.setRecording('isActive', !store.recording.isActive)
+          break
+        case 'f':
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+          } else {
+            document.exitFullscreen()
+          }
+          break
+        case 'backspace':
+          // Optional: Reset param helper? Maybe too dangerous.
+          break
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -58,6 +83,15 @@ function App() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v18h-6M10 17l5-5-5-5M13 12H3" /></svg>
         </button>
       )}
+
+      {/* Recording Indicator */}
+      {useStore((state) => state.recording.isActive) && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 pointer-events-none animate-pulse">
+          <div className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+          <span className="text-red-500 font-bold font-mono text-xs tracking-widest uppercase">REC</span>
+        </div>
+      )}
+
       <HelpModal />
     </div>
   )

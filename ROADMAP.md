@@ -38,7 +38,7 @@ This roadmap outlines major milestones and associated issues for future developm
 
 ## Milestone 6 – Documentation & Tutorials
 
-- [ ] **User guide**: Write comprehensive user documentation covering installation, controls, generator descriptions, MIDI mapping and export options.
+- [x] **User guide**: Write comprehensive user documentation covering installation, controls, generator descriptions, MIDI mapping and export options.
 - [ ] **Developer docs**: Document code structure and contribute guidelines to encourage community contributions.
 - [ ] **Video tutorials**: Produce short tutorial videos demonstrating setup, creating visuals, using MIDI control and sharing presets.
 

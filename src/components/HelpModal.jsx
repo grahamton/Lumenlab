@@ -132,14 +132,24 @@ export function HelpModal() {
                 </div>
               </div>
             </div>
-            {/* Gamepad Info */}
-            <div className="mt-4 bg-neutral-800/30 p-4 rounded-xl border border-neutral-800 flex gap-4 items-center">
-              <Gamepad2 size={24} className="text-indigo-400" />
-              <div>
-                <strong className="text-indigo-400 block text-sm mb-1 uppercase tracking-wider">Gamepad Supported</strong>
+            {/* Gamepad & Hotkeys Info */}
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="bg-neutral-800/30 p-4 rounded-xl border border-neutral-800 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm uppercase tracking-wider">
+                  <Gamepad2 size={16} /> Gamepad
+                </div>
                 <p className="text-xs text-neutral-400">
-                  <strong>Left Stick:</strong> Pan • <strong>Right Stick:</strong> Zoom/Rotate • <strong>Triggers:</strong> Distortion<br />
-                  <strong>A:</strong> Play/Pause • <strong>B:</strong> Symmetry • <strong>X:</strong> Invert • <strong>Y:</strong> Randomize
+                  <strong>L-Stick:</strong> Pan • <strong>R-Stick:</strong> Zoom<br />
+                  <strong>Triggers:</strong> Distort • <strong>Buttons:</strong> A/B/X/Y
+                </p>
+              </div>
+              <div className="bg-neutral-800/30 p-4 rounded-xl border border-neutral-800 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-neutral-300 font-bold text-sm uppercase tracking-wider">
+                  <Monitor size={16} /> Keyboard
+                </div>
+                <p className="text-xs text-neutral-400">
+                  <strong>TAB:</strong> Hide UI • <strong>F:</strong> Fullscreen<br />
+                  <strong>S:</strong> Snapshot • <strong>R:</strong> Record
                 </p>
               </div>
             </div>
