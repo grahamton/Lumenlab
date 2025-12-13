@@ -6,8 +6,8 @@ This roadmap outlines major milestones and associated issues for future developm
 
 - [x] **Design MIDI architecture**: Research and select a cross‑platform MIDI library and decide how to map incoming MIDI messages to internal parameters.
 - [x] **Implement MIDI input**: Add support for reading MIDI events (note on/off, control change) and map them to visual engine controls such as generator parameters, effect intensities and presets.
-- [ ] **MIDI mapping UI**: Provide a user interface for assigning MIDI controls to specific parameters; include save/load of MIDI mappings.
-- [ ] **Cross‑platform testing**: Verify MIDI functionality on Windows, macOS and Linux; address latency and device compatibility issues.
+- [x] **MIDI mapping UI**: Provide a user interface for assigning MIDI controls to specific parameters; include save/load of MIDI mappings.
+- [x] **Cross‑platform testing**: Verify MIDI functionality on Windows, macOS and Linux; address latency and device compatibility issues.
 
 ## Milestone 2 – Generative Engine Expansion
 

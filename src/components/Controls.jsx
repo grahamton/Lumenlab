@@ -1,27 +1,46 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState } from 'react'
 import { CONTROLS } from '../config/uiConfig'
 import { useStore } from '../store/useStore'
 import { CubeIcon, GridIcon, EyeIcon, SlidersIcon } from './Icons'
-import { Sliders, Activity, Monitor, Download, Maximize, RefreshCw, Layers, Zap, Undo2, RotateCcw, Power } from 'lucide-react'
+import { Sliders, Activity, Monitor, Download, Maximize, RefreshCw, Layers, Zap, Undo2, RotateCcw, Power, Gamepad2, Pause, StopCircle, Play, Music, Sparkles, Settings } from 'lucide-react'
 
 // Minimal Control Components
-const ControlGroup = ({ label, value, min, max, onChange, step = 1 }) => (
-  <div className="flex flex-col gap-1 mb-3">
-    <div className="flex justify-between text-[10px] text-neutral-400 uppercase tracking-wider font-bold">
-      <span>{label}</span>
-      <span className="text-cyan-400 font-mono">{typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}</span>
+const ControlGroup = ({ label, value, min, max, onChange, step = 1, path }) => {
+  const { ui, midi, setUi } = useStore()
+  const isLearning = ui.midiLearnActive
+  const isSelected = ui.midiLearnId === path
+  // Efficiently check if mapped (could optimize this lookup in store, but iterating ~20 keys is fine)
+  const isMapped = path && Object.values(midi.mappings).includes(path)
+
+  const handleClick = (e) => {
+    if (isLearning && path) {
+      e.stopPropagation()
+      setUi('midiLearnId', path)
+    }
+  }
+
+  return (
+    <div
+      className={`flex flex-col gap-1 mb-3 transition-all rounded p-1 -mx-1 ${isLearning ? 'cursor-pointer hover:bg-neutral-800' : ''} ${isSelected ? 'bg-cyan-900/40 ring-1 ring-cyan-400' : ''} ${isMapped && !isSelected ? 'border-l-2 border-cyan-500 pl-2' : ''}`}
+      onClick={handleClick}
+    >
+      <div className="flex justify-between text-[10px] text-neutral-400 uppercase tracking-wider font-bold">
+        <span className={isMapped ? "text-cyan-400" : ""}>{label} {isMapped && "•"}</span>
+        <span className="text-cyan-400 font-mono">{typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        disabled={isLearning}
+        className={`w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-900 ${isLearning ? 'pointer-events-none opacity-50' : ''}`}
+      />
     </div>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-900"
-    />
-  </div>
-)
+  )
+}
 
 const Toggle = ({ label, value, onChange }) => (
   <div className="flex items-center justify-between mb-3 py-1">
@@ -47,6 +66,9 @@ const TabButton = ({ icon: Icon, active, onClick }) => (
 export function Controls() {
   const store = useStore()
   const { ui, setUi } = store
+
+  // Local UI State
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Handlers for File Input
   const fileInputRef = useRef(null)
@@ -130,42 +152,42 @@ export function Controls() {
 
         {store.generator.type === 'fibonacci' && (
           <>
-            <ControlGroup label="Density" step={1} value={store.generator.param1} min={1} max={200} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label="Zoom" step={0.1} value={store.generator.param2} min={0.1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
-            <ControlGroup label="Speed" step={1} value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+            <ControlGroup path="generator.param1" label="Density" step={1} value={store.generator.param1} min={1} max={200} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label="Zoom" step={0.1} value={store.generator.param2} min={0.1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param3" label="Speed" step={1} value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
           </>
         )}
         {store.generator.type === 'voronoi' && (
           <>
-            <ControlGroup label={CONTROLS.generator.param1.label} value={store.generator.param1} min={CONTROLS.generator.param1.min} max={CONTROLS.generator.param1.max} step={CONTROLS.generator.param1.step} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label={CONTROLS.generator.param2.label} value={store.generator.param2} min={CONTROLS.generator.param2.min} max={CONTROLS.generator.param2.max} step={CONTROLS.generator.param2.step} onChange={(v) => store.setGenerator('param2', v)} />
-            <ControlGroup label={CONTROLS.generator.param3.label} value={store.generator.param3} min={CONTROLS.generator.param3.min} max={CONTROLS.generator.param3.max} step={CONTROLS.generator.param3.step} onChange={(v) => store.setGenerator('param3', v)} />
+            <ControlGroup path="generator.param1" label={CONTROLS.generator.param1.label} value={store.generator.param1} min={CONTROLS.generator.param1.min} max={CONTROLS.generator.param1.max} step={CONTROLS.generator.param1.step} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label={CONTROLS.generator.param2.label} value={store.generator.param2} min={CONTROLS.generator.param2.min} max={CONTROLS.generator.param2.max} step={CONTROLS.generator.param2.step} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param3" label={CONTROLS.generator.param3.label} value={store.generator.param3} min={CONTROLS.generator.param3.min} max={CONTROLS.generator.param3.max} step={CONTROLS.generator.param3.step} onChange={(v) => store.setGenerator('param3', v)} />
           </>
         )}
         {store.generator.type === 'grid' && (
           <>
-            <ControlGroup label="Spacing" value={store.generator.param1} min={10} max={200} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label="Thickness" value={store.generator.param2} min={1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
-            <ControlGroup label="Blur" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+            <ControlGroup path="generator.param1" label="Spacing" value={store.generator.param1} min={10} max={200} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label="Thickness" value={store.generator.param2} min={1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param3" label="Blur" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
           </>
         )}
         {store.generator.type === 'liquid' && (
           <>
-            <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param1" label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
           </>
         )}
         {store.generator.type === 'plasma' && (
           <>
-            <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param1" label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
           </>
         )}
         {store.generator.type === 'fractal' && (
           <>
-            <ControlGroup label="Scale" value={store.generator.param1} min={0} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-            <ControlGroup label="Detail" value={store.generator.param2} min={0} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-            <ControlGroup label="Turbulence" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+            <ControlGroup path="generator.param1" label="Scale" value={store.generator.param1} min={0} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup path="generator.param2" label="Detail" value={store.generator.param2} min={0} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup path="generator.param3" label="Turbulence" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
           </>
         )}
       </div>
@@ -179,10 +201,10 @@ export function Controls() {
         <div className="flex items-center gap-2 text-xs text-orange-400 font-bold uppercase tracking-wider mb-4">
           <Layers size={12} /> Transforms
         </div>
-        <ControlGroup label={CONTROLS.transforms.scale.label} step={CONTROLS.transforms.scale.step} value={store.transforms.scale} min={CONTROLS.transforms.scale.min} max={CONTROLS.transforms.scale.max} onChange={(v) => store.setTransform('scale', v)} />
-        <ControlGroup label={CONTROLS.transforms.rotation.label} step={CONTROLS.transforms.rotation.step} value={store.transforms.rotation} min={CONTROLS.transforms.rotation.min} max={CONTROLS.transforms.rotation.max} onChange={(v) => store.setTransform('rotation', v)} />
-        <ControlGroup label={CONTROLS.transforms.x.label} step={CONTROLS.transforms.x.step} value={store.transforms.x} min={CONTROLS.transforms.x.min} max={CONTROLS.transforms.x.max} onChange={(v) => store.setTransform('x', v)} />
-        <ControlGroup label={CONTROLS.transforms.y.label} step={CONTROLS.transforms.y.step} value={store.transforms.y} min={CONTROLS.transforms.y.min} max={CONTROLS.transforms.y.max} onChange={(v) => store.setTransform('y', v)} />
+        <ControlGroup path="transforms.scale" label={CONTROLS.transforms.scale.label} step={CONTROLS.transforms.scale.step} value={store.transforms.scale} min={CONTROLS.transforms.scale.min} max={CONTROLS.transforms.scale.max} onChange={(v) => store.setTransform('scale', v)} />
+        <ControlGroup path="transforms.rotation" label={CONTROLS.transforms.rotation.label} step={CONTROLS.transforms.rotation.step} value={store.transforms.rotation} min={CONTROLS.transforms.rotation.min} max={CONTROLS.transforms.rotation.max} onChange={(v) => store.setTransform('rotation', v)} />
+        <ControlGroup path="transforms.x" label={CONTROLS.transforms.x.label} step={CONTROLS.transforms.x.step} value={store.transforms.x} min={CONTROLS.transforms.x.min} max={CONTROLS.transforms.x.max} onChange={(v) => store.setTransform('x', v)} />
+        <ControlGroup path="transforms.y" label={CONTROLS.transforms.y.label} step={CONTROLS.transforms.y.step} value={store.transforms.y} min={CONTROLS.transforms.y.min} max={CONTROLS.transforms.y.max} onChange={(v) => store.setTransform('y', v)} />
       </div>
 
       <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
@@ -201,7 +223,7 @@ export function Controls() {
               </button>
             ))}
           </div>
-          <ControlGroup label="Tile Scale" step={0.1} value={store.tiling.scale} min={0.1} max={5.0} onChange={(v) => store.setTiling('scale', v)} />
+          <ControlGroup path="tiling.scale" label="Tile Scale" step={0.1} value={store.tiling.scale} min={0.1} max={5.0} onChange={(v) => store.setTiling('scale', v)} />
         </div>
       </div>
 
@@ -225,7 +247,7 @@ export function Controls() {
               ))}
             </div>
             {store.symmetry.type === 'radial' && (
-              <ControlGroup label={CONTROLS.symmetry.slices.label} value={store.symmetry.slices} min={CONTROLS.symmetry.slices.min} max={CONTROLS.symmetry.slices.max} step={CONTROLS.symmetry.slices.step} onChange={(v) => store.setSymmetry('slices', v)} />
+              <ControlGroup path="symmetry.slices" label={CONTROLS.symmetry.slices.label} value={store.symmetry.slices} min={CONTROLS.symmetry.slices.min} max={CONTROLS.symmetry.slices.max} step={CONTROLS.symmetry.slices.step} onChange={(v) => store.setSymmetry('slices', v)} />
             )}
           </div>
         )}
@@ -235,8 +257,8 @@ export function Controls() {
           <div className="flex items-center justify-between mb-2">
             <label className="text-[10px] text-neutral-500 font-bold uppercase">Liquify</label>
           </div>
-          <ControlGroup label={CONTROLS.displacement.amp.label} value={store.displacement.amp} min={CONTROLS.displacement.amp.min} max={CONTROLS.displacement.amp.max} step={CONTROLS.displacement.amp.step} onChange={(v) => store.setDisplacement('amp', v)} />
-          <ControlGroup label={CONTROLS.displacement.freq.label} value={store.displacement.freq} min={CONTROLS.displacement.freq.min} max={CONTROLS.displacement.freq.max} step={CONTROLS.displacement.freq.step} onChange={(v) => store.setDisplacement('freq', v)} />
+          <ControlGroup path="displacement.amp" label={CONTROLS.displacement.amp.label} value={store.displacement.amp} min={CONTROLS.displacement.amp.min} max={CONTROLS.displacement.amp.max} step={CONTROLS.displacement.amp.step} onChange={(v) => store.setDisplacement('amp', v)} />
+          <ControlGroup path="displacement.freq" label={CONTROLS.displacement.freq.label} value={store.displacement.freq} min={CONTROLS.displacement.freq.min} max={CONTROLS.displacement.freq.max} step={CONTROLS.displacement.freq.step} onChange={(v) => store.setDisplacement('freq', v)} />
         </div>
 
         {/* Warp */}
@@ -268,24 +290,24 @@ export function Controls() {
         </div>
 
         {/* Posterize */}
-        <ControlGroup label={CONTROLS.color.posterize.label} value={store.color.posterize} min={CONTROLS.color.posterize.min} max={CONTROLS.color.posterize.max} step={CONTROLS.color.posterize.step} onChange={(v) => store.setColor('posterize', v)} />
+        <ControlGroup path="color.posterize" label={CONTROLS.color.posterize.label} value={store.color.posterize} min={CONTROLS.color.posterize.min} max={CONTROLS.color.posterize.max} step={CONTROLS.color.posterize.step} onChange={(v) => store.setColor('posterize', v)} />
 
         {/* RGB Balance */}
         <div className="mt-4 pt-4 border-t border-neutral-800">
           <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">RGB Balance</label>
           <div className="grid grid-cols-3 gap-2">
-            <ControlGroup label="R" value={store.color.r} min={CONTROLS.color.r.min} max={CONTROLS.color.r.max} step={CONTROLS.color.r.step} onChange={(v) => store.setColor('r', v)} />
-            <ControlGroup label="G" value={store.color.g} min={CONTROLS.color.g.min} max={CONTROLS.color.g.max} step={CONTROLS.color.g.step} onChange={(v) => store.setColor('g', v)} />
-            <ControlGroup label="B" value={store.color.b} min={CONTROLS.color.b.min} max={CONTROLS.color.b.max} step={CONTROLS.color.b.step} onChange={(v) => store.setColor('b', v)} />
+            <ControlGroup path="color.r" label="R" value={store.color.r} min={CONTROLS.color.r.min} max={CONTROLS.color.r.max} step={CONTROLS.color.r.step} onChange={(v) => store.setColor('r', v)} />
+            <ControlGroup path="color.g" label="G" value={store.color.g} min={CONTROLS.color.g.min} max={CONTROLS.color.g.max} step={CONTROLS.color.g.step} onChange={(v) => store.setColor('g', v)} />
+            <ControlGroup path="color.b" label="B" value={store.color.b} min={CONTROLS.color.b.min} max={CONTROLS.color.b.max} step={CONTROLS.color.b.step} onChange={(v) => store.setColor('b', v)} />
           </div>
         </div>
 
         {/* HSL */}
         <div className="mt-4 pt-4 border-t border-neutral-800">
           <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">HSL</label>
-          <ControlGroup label={CONTROLS.color.hue.label} value={store.color.hue} min={CONTROLS.color.hue.min} max={CONTROLS.color.hue.max} step={CONTROLS.color.hue.step} onChange={(v) => store.setColor('hue', v)} />
-          <ControlGroup label={CONTROLS.color.sat.label} value={store.color.sat} min={CONTROLS.color.sat.min} max={CONTROLS.color.sat.max} step={CONTROLS.color.sat.step} onChange={(v) => store.setColor('sat', v)} />
-          <ControlGroup label={CONTROLS.color.light.label} value={store.color.light} min={CONTROLS.color.light.min} max={CONTROLS.color.light.max} step={CONTROLS.color.light.step} onChange={(v) => store.setColor('light', v)} />
+          <ControlGroup path="color.hue" label={CONTROLS.color.hue.label} value={store.color.hue} min={CONTROLS.color.hue.min} max={CONTROLS.color.hue.max} step={CONTROLS.color.hue.step} onChange={(v) => store.setColor('hue', v)} />
+          <ControlGroup path="color.sat" label={CONTROLS.color.sat.label} value={store.color.sat} min={CONTROLS.color.sat.min} max={CONTROLS.color.sat.max} step={CONTROLS.color.sat.step} onChange={(v) => store.setColor('sat', v)} />
+          <ControlGroup path="color.light" label={CONTROLS.color.light.label} value={store.color.light} min={CONTROLS.color.light.min} max={CONTROLS.color.light.max} step={CONTROLS.color.light.step} onChange={(v) => store.setColor('light', v)} />
         </div>
       </div>
 
@@ -298,7 +320,7 @@ export function Controls() {
           <Toggle label="" value={store.audio.enabled} onChange={(v) => store.setAudio('enabled', v)} />
         </div>
         {store.audio.enabled && (
-          <ControlGroup label="Sensitivity" step={0.1} value={store.audio.sensitivity} min={0.1} max={5.0} onChange={(v) => store.setAudio('sensitivity', v)} />
+          <ControlGroup path="audio.sensitivity" label="Sensitivity" step={0.1} value={store.audio.sensitivity} min={0.1} max={5.0} onChange={(v) => store.setAudio('sensitivity', v)} />
         )}
       </div>
 
@@ -307,14 +329,14 @@ export function Controls() {
         <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold uppercase tracking-wider mb-4">
           <Monitor size={12} /> Post Processing
         </div>
-        <ControlGroup label="Bloom" step={0.1} value={store.effects.bloom} min={0} max={3} onChange={(v) => store.setEffect('bloom', v)} />
-        <ControlGroup label="Chromatic Aberration" value={store.effects.chromaticAberration} min={0} max={50} onChange={(v) => store.setEffect('chromaticAberration', v)} />
-        <ControlGroup label="Noise" step={0.01} value={store.effects.noise} min={0} max={1} onChange={(v) => store.setEffect('noise', v)} />
+        <ControlGroup path="effects.bloom" label="Bloom" step={0.1} value={store.effects.bloom} min={0} max={3} onChange={(v) => store.setEffect('bloom', v)} />
+        <ControlGroup path="effects.chromaticAberration" label="Chromatic Aberration" value={store.effects.chromaticAberration} min={0} max={50} onChange={(v) => store.setEffect('chromaticAberration', v)} />
+        <ControlGroup path="effects.noise" label="Noise" step={0.01} value={store.effects.noise} min={0} max={1} onChange={(v) => store.setEffect('noise', v)} />
 
         {/* Shader Effects (0-100) */}
-        <ControlGroup label="Invert" step={1} value={store.effects.invert} min={0} max={100} onChange={(v) => store.setEffect('invert', v)} />
-        <ControlGroup label="Solarize" step={1} value={store.effects.solarize} min={0} max={100} onChange={(v) => store.setEffect('solarize', v)} />
-        <ControlGroup label="RGB Shift" step={1} value={store.effects.shift} min={0} max={100} onChange={(v) => store.setEffect('shift', v)} />
+        <ControlGroup path="effects.invert" label="Invert" step={1} value={store.effects.invert} min={0} max={100} onChange={(v) => store.setEffect('invert', v)} />
+        <ControlGroup path="effects.solarize" label="Solarize" step={1} value={store.effects.solarize} min={0} max={100} onChange={(v) => store.setEffect('solarize', v)} />
+        <ControlGroup path="effects.shift" label="RGB Shift" step={1} value={store.effects.shift} min={0} max={100} onChange={(v) => store.setEffect('shift', v)} />
       </div>
     </div>
   )
@@ -322,6 +344,72 @@ export function Controls() {
   // TAB 3: GLOBAL (Animation, Sequencer, Output)
   const renderGlobal = () => (
     <div className="space-y-6">
+
+      {/* Motion Manager */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-indigo-400 font-bold uppercase tracking-wider mb-4">
+          <Activity size={12} /> Motion Manager
+        </div>
+
+        {/* Master Controls */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setUi('globalPause', !ui.globalPause)}
+            className={`flex-1 py-3 rounded text-[10px] uppercase font-bold flex flex-col items-center gap-1 transition-all ${ui.globalPause ? 'bg-cyan-500 text-black animate-pulse' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+          >
+            <Pause size={16} /> {ui.globalPause ? 'FROZEN' : 'FREEZE WORLD'}
+          </button>
+          <button
+            onClick={store.stopAllMotion}
+            className="flex-1 py-3 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded text-[10px] uppercase font-bold flex flex-col items-center gap-1 transition-all"
+          >
+            <StopCircle size={16} /> STOP ALL
+          </button>
+        </div>
+
+        {/* Activity Status */}
+        <div className="grid grid-cols-2 gap-2">
+
+          {/* Generator Status */}
+          <div className={`p-2 rounded border flex items-center justify-between ${store.generator.isAnimated ? 'bg-neutral-800 border-green-900/50 text-green-400' : 'bg-neutral-900 border-neutral-800 text-neutral-600'}`}>
+            <div className="flex items-center gap-2">
+              <RefreshCw size={12} className={store.generator.isAnimated ? "animate-spin" : ""} />
+              <span className="text-[9px] uppercase font-bold">Generator</span>
+            </div>
+            <Toggle value={store.generator.isAnimated} onChange={(v) => store.setGenerator('isAnimated', v)} />
+          </div>
+
+          {/* Sequencer Status */}
+          <div className={`p-2 rounded border flex items-center justify-between ${store.animation.isPlaying ? 'bg-neutral-800 border-cyan-900/50 text-cyan-400' : 'bg-neutral-900 border-neutral-800 text-neutral-600'}`}>
+            <div className="flex items-center gap-2">
+              <Play size={12} className={store.animation.isPlaying ? "fill-current" : ""} />
+              <span className="text-[9px] uppercase font-bold">Sequencer</span>
+            </div>
+            <Toggle value={store.animation.isPlaying} onChange={(v) => store.setAnimation('isPlaying', v)} />
+          </div>
+
+          {/* Audio Status */}
+          <div className={`p-2 rounded border flex items-center justify-between ${store.audio.enabled ? 'bg-neutral-800 border-pink-900/50 text-pink-400' : 'bg-neutral-900 border-neutral-800 text-neutral-600'}`}>
+            <div className="flex items-center gap-2">
+              <Music size={12} className={store.audio.enabled ? "animate-pulse" : ""} />
+              <span className="text-[9px] uppercase font-bold">Audio</span>
+            </div>
+            <Toggle value={store.audio.enabled} onChange={(v) => store.setAudio('enabled', v)} />
+          </div>
+
+          {/* Flux Status */}
+          <div className={`p-2 rounded border flex items-center justify-between ${store.flux?.enabled ? 'bg-neutral-800 border-purple-900/50 text-purple-400' : 'bg-neutral-900 border-neutral-800 text-neutral-600'}`}>
+            <div className="flex items-center gap-2">
+              <Sparkles size={12} className={store.flux?.enabled ? "animate-pulse" : ""} />
+              <span className="text-[9px] uppercase font-bold">Flux</span>
+            </div>
+            <Toggle value={store.flux?.enabled || false} onChange={(v) => store.setFlux('enabled', v)} />
+          </div>
+
+        </div>
+
+      </div>
+
       {/* Animation & Sequencer */}
       {/* Advanced Sequencer & Animation */}
       <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
@@ -397,6 +485,7 @@ export function Controls() {
         <div className="space-y-3 pt-3 border-t border-neutral-800">
           {/* Speed / Duration */}
           <ControlGroup
+            path="animation.transitionTime"
             label="Transition Time (ms)"
             step={100}
             value={store.animation.transitionTime}
@@ -481,7 +570,7 @@ export function Controls() {
   return (
     <div className={containerClasses}>
       {/* Layout Toggle (Mini Header) */}
-      <div className="flex items-center justify-between gap-1 p-2 border-b border-neutral-900/50 bg-neutral-950/50">
+      <div className="relative flex items-center justify-between gap-1 p-2 border-b border-neutral-900/50 bg-neutral-950/50">
 
         {/* History / Reset Controls */}
         <div className="flex gap-1">
@@ -517,19 +606,115 @@ export function Controls() {
           ))}
         </div>
 
-        {/* Hard Reset */}
+        {/* Settings Button */}
         <button
-          onClick={() => {
-            if (confirm('FACTORY RESET? This will wipe all data and reload.')) {
-              localStorage.clear()
-              window.location.reload()
-            }
-          }}
-          className="p-1.5 rounded text-red-900 hover:text-red-500 hover:bg-red-900/20 transition-all"
-          title="Factory Reset (Hard Reload)"
+          onClick={() => setSettingsOpen(!settingsOpen)}
+          className={`p-1.5 rounded transition-all ${settingsOpen ? 'text-cyan-400 bg-neutral-800' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+          title="Settings"
         >
-          <Power size={14} />
+          <Settings size={14} />
         </button>
+
+        {/* Settings Popover */}
+        {settingsOpen && (
+          <div className="absolute top-10 right-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl p-3 z-50 flex flex-col gap-3">
+            <h3 className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Startup Settings</h3>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-neutral-300">Resume Last Session</label>
+                <Toggle
+                  label=""
+                  value={ui.resumeOnStartup !== false} // Default to true if undefined
+                  onChange={(v) => setUi('resumeOnStartup', v)}
+                />
+              </div>
+            </div>
+
+            <div className="h-px bg-neutral-800" />
+
+            {/* MIDI SETTINGS */}
+            <h3 className="text-[10px] text-cyan-500 font-bold uppercase tracking-wider flex items-center justify-between">
+              MIDI Control
+              <span className={`w-2 h-2 rounded-full ${store.midi.inputs.length > 0 ? 'bg-green-500' : 'bg-neutral-600'}`} />
+            </h3>
+
+            <div className="bg-black/30 rounded p-2 border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-neutral-300">Learn Mode</label>
+                <Toggle
+                  label=""
+                  value={store.ui.midiLearnActive}
+                  onChange={(v) => {
+                    store.setUi('midiLearnActive', v)
+                    if (v) store.setUi('midiLearnId', null) // Reset selection when entering
+                  }}
+                />
+              </div>
+
+              {store.ui.midiLearnActive && (
+                <div className="text-[9px] text-cyan-400 bg-cyan-900/20 p-1.5 rounded border border-cyan-900/50">
+                  {store.ui.midiLearnId ? (
+                    <span>Waiting for MIDI...<br /><span className="text-white font-mono">{store.ui.midiLearnId}</span></span>
+                  ) : (
+                    <span>Click a slider to map</span>
+                  )}
+                </div>
+              )}
+
+              {store.midi.inputs.length === 0 ? (
+                <div className="text-[9px] text-neutral-500 italic">No MIDI devices found.</div>
+              ) : (
+                <div className="space-y-1">
+                  {store.midi.inputs.map(input => (
+                    <div key={input.id} className="text-[9px] text-neutral-400 truncate" title={input.name}>
+                      🎹 {input.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Active Mappings List */}
+            {Object.keys(store.midi.mappings).length > 0 && (
+              <div className="max-h-32 overflow-y-auto custom-scrollbar border-t border-neutral-800 pt-2">
+                <div className="text-[9px] text-neutral-500 font-bold uppercase mb-1">Mappings</div>
+                {Object.entries(store.midi.mappings).map(([key, path]) => (
+                  <div key={key} className="flex justify-between items-center text-[9px] bg-neutral-800/50 p-1 rounded mb-1">
+                    <span className="text-cyan-300 truncate w-24" title={path}>{path}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-500 font-mono">{key.split('-')[2]}</span>
+                      <button
+                        onClick={() => store.clearMidiMapping(key)}
+                        className="text-red-400 hover:text-red-300 w-4 h-4 flex items-center justify-center bg-neutral-800 rounded hover:bg-neutral-700"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="h-px bg-neutral-800" />
+
+            <h3 className="text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
+              Danger Zone
+            </h3>
+
+            <button
+              onClick={() => {
+                if (confirm('FACTORY RESET? This will wipe all data, presets, and history.')) {
+                  store.resetAll()
+                  window.location.reload()
+                }
+              }}
+              className="w-full py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2 transition-all"
+            >
+              <Power size={12} /> Factory Reset
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tab Bar */}
@@ -549,8 +734,13 @@ export function Controls() {
       </div>
 
       {/* Footer / Logo Area */}
-      <div className="p-4 border-t border-neutral-900/50 text-center">
+      <div className="p-4 border-t border-neutral-900/50 text-center flex flex-col items-center gap-1">
         <h1 className="text-xs font-bold text-neutral-600 tracking-[0.2em] uppercase">Lumen Lab <span className="text-cyan-900">v0.6</span></h1>
+        {store.ui.gamepadConnected && (
+          <div className="flex items-center gap-1 text-[9px] text-green-500 font-bold uppercase animate-pulse">
+            <Gamepad2 size={10} /> Controller Active
+          </div>
+        )}
       </div>
     </div>
   )

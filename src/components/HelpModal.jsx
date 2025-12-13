@@ -108,10 +108,36 @@ export function HelpModal() {
             </div>
           </section>
 
-          {/* Section 4: Time & Motion */}
+          {/* Section 4: MIDI Control */}
           <section>
             <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-              <Play size={18} className="text-green-400" /> 4. Flux & Visualizer
+              <Zap size={18} className="text-yellow-400" /> 4. MIDI Control
+            </h3>
+            <div className="bg-neutral-800/30 p-4 rounded-xl border border-neutral-800 space-y-3">
+              <p className="text-sm text-neutral-300">
+                Connect any MIDI controller and map knobs, faders, or buttons to almost any parameter in Lumen Lab.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-900/50 p-2 rounded border border-neutral-700">
+                  <strong className="text-cyan-400 block text-xs uppercase mb-1">Learn Mode</strong>
+                  <p className="text-xs text-neutral-400">
+                    Open <strong>Settings</strong> → <strong>MIDI Control</strong> and toggle <strong>Learn Mode</strong>. Click any slider, then move a knob on your controller to map it instantly.
+                  </p>
+                </div>
+                <div className="bg-neutral-900/50 p-2 rounded border border-neutral-700">
+                  <strong className="text-green-400 block text-xs uppercase mb-1">Live Performance</strong>
+                  <p className="text-xs text-neutral-400">
+                    Mappings are saved automatically. Use MIDI to control effects intensity, generator speed, or switch presets without touching the mouse.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 5: Time & Motion */}
+          <section>
+            <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+              <Play size={18} className="text-green-400" /> 5. Flux & Visualizer
             </h3>
             <div className="bg-neutral-800/30 p-4 rounded-xl border border-neutral-800">
               <p className="text-sm text-neutral-300 mb-2">

@@ -23,6 +23,7 @@
 -   **Audio Reactivity**: Visuals pulse and shift to your microphone or music input.
 -   **Generative Engines**: Built-in mathematical generators like Fibonacci, Voronoi, Liquid, and Plasma.
 -   **Advanced Symmetry**: Radial, Mirror X, and Mirror Y modes with offset control.
+-   **MIDI Control**: Map any MIDI controller to parameters with an easy-to-use Learn Mode.
 -   **Pro Effects Stack**: Bloom, Glitch, Noise, and Analog Color Grading (RGB/HSL).
 -   **Preset Manager**: Save your own custom configurations or choose from 10+ built-in styles.
 -   **Autosave**: Never lose your flow—the app remembers exactly where you left off.

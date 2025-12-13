@@ -19,6 +19,7 @@ function VisualizerScene() {
   const triggerExport = useStore((state) => state.triggerExport)
   const fluxEnabled = useStore((state) => state.flux?.enabled)
   const shape = useStore((state) => state.canvas.shape)
+  const globalPause = useStore((state) => state.ui.globalPause) // FREEZE
   // Audio State
   const audio = useStore((state) => state.audio || {})
 
@@ -137,13 +138,14 @@ function VisualizerScene() {
     } = useStore.getState() // Access fresh state without re-render
 
     // Time Logic: Always translate global time
-    timeRef.current += delta
-    uniformValues.uTime.value = timeRef.current
-
-    // Generator Time Logic: Only advance if animated
-    if (generator.isAnimated !== false) { // Default to true if undefined
-      genTimeRef.current += delta
+    if (!useStore.getState().ui.globalPause) {
+      timeRef.current += delta
+      // Generator Time Logic: Only advance if animated
+      if (generator.isAnimated !== false) { // Default to true if undefined
+        genTimeRef.current += delta
+      }
     }
+    uniformValues.uTime.value = timeRef.current
     uniformValues.uGenTime.value = genTimeRef.current
 
     // Audio Analysis

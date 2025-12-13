@@ -1,161 +1,247 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { CONTROLS } from '../config/uiConfig'
+
+const DEFAULTS = {
+  image: null,
+  transforms: {
+    x: 0,
+    y: 0,
+    scale: 1,
+    rotation: 0,
+  },
+  symmetry: {
+    enabled: false,
+    type: 'radial',
+    slices: 6,
+    offset: 0,
+  },
+  warp: {
+    type: 'none',
+  },
+  displacement: {
+    amp: 0,
+    freq: 10,
+  },
+  masking: {
+    lumaThreshold: 0,
+    centerRadius: 0,
+    invertLuma: false,
+    feather: 0.0,
+  },
+  tiling: {
+    type: 'none',
+    scale: 1.0,
+    overlap: 0.0,
+  },
+  generator: {
+    type: 'none',
+    param1: 50,
+    param2: 50,
+    param3: 50,
+    isAnimated: true,
+  },
+  color: {
+    posterize: 32,
+    r: 1.0, g: 1.0, b: 1.0,
+    hue: 0.0, sat: 1.0, light: 1.0,
+    // Add default values if not present in DEFAULTS but present in CONTROLS
+  },
+  effects: {
+    edgeDetect: 0,
+    invert: 0,
+    solarize: 0,
+    shift: 0,
+    bloom: 0,
+    chromaticAberration: 0,
+    noise: 0,
+  },
+  canvas: {
+    width: 1920,
+    height: 1080,
+    aspect: 'video',
+    fit: 'contain',
+    shape: 'rectangle',
+  },
+  snapshots: [],
+  userPresets: [],
+  animation: {
+    isPlaying: false,
+    mode: 'loop',
+    bpm: 120,
+    transitionTime: 2000,
+    easing: 'easeInOut',
+    activeStep: 0,
+    strobeSafety: true,
+  },
+  flux: {
+    enabled: false,
+  },
+  lfo: {
+    active: false,
+    oscillators: []
+  },
+  audio: {
+    enabled: false,
+    source: 'mic',
+    sensitivity: 1.0,
+    reactivity: {
+      bass: 1.0,
+      mid: 1.0,
+      high: 1.0,
+    }
+  },
+  midi: {
+    isEnabled: false,
+    inputs: [],
+    lastMsg: null,
+    mappings: {}
+  },
+  ui: {
+    activeTab: 0,
+    layout: 'sidebar',
+    helpOpen: true,
+    controlsOpen: true,
+    exportRequest: null,
+    gamepadConnected: false,
+    globalPause: false,
+    resumeOnStartup: true, // New Preference: Default to TRUE
+    midiLearnActive: false,
+    midiLearnId: null, // The parameter path waiting for MIDI input
+  },
+  recording: { isActive: false, progress: 0 },
+  history: [],
+}
 
 export const useStore = create(
   persist(
     (set, get) => ({
-      // Image State
-      image: null,
+      ...DEFAULTS,
+
+      // --- Setters ---
       setImage: (img) => set({ image: img }),
-
-      // Affine Transformation State
-      transforms: {
-        x: 0,
-        y: 0,
-        scale: 1,
-        rotation: 0, // in radians
-      },
-
-      // Symmetry State
-      symmetry: {
-        enabled: false,
-        type: 'radial', // 'radial', 'mirrorX', 'mirrorY'
-        slices: 6,
-        offset: 0,
-      },
-
-      // Warp State (Distortion)
-      warp: {
-        type: 'none', // 'none', 'polar', 'log-polar'
-      },
-
-      // Displacement State (Liquify)
-      displacement: {
-        amp: 0,
-        freq: 10,
-      },
-
-      // Masking State (Vignette/Luma)
-      masking: {
-        lumaThreshold: 0,
-        centerRadius: 0,
-        invertLuma: false,
-        feather: 0.0,
-      },
-
-      // Tiling State
-      tiling: {
-        type: 'none', // 'none', 'p1', 'p2', 'p4m'
-        scale: 1.0,
-        overlap: 0.0,
-      },
-
-      // Math Seeds (Generative)
-      generator: {
-        type: 'none', // 'none', 'fibonacci', 'voronoi', 'grid'
-        param1: 50,
-        param2: 50,
-        param3: 50,
-        isAnimated: true,
-      },
-
-      // Alchemist's Lab
-      color: {
-        posterize: 32,
-        r: 1.0, g: 1.0, b: 1.0,
-        hue: 0.0, sat: 1.0, light: 1.0,
-      },
-      effects: {
-        edgeDetect: 0,
-        invert: 0,
-        solarize: 0,
-        shift: 0,
-        bloom: 0, // 0-1
-        chromaticAberration: 0, // 0-1
-        noise: 0, // 0-1
-      },
-
-      // The Projectionist (Canvas Control)
-      canvas: {
-        width: 1920,
-        height: 1080,
-        aspect: 'video', // 'free', 'video', 'square', 'portrait'
-        fit: 'contain',
-        shape: 'rectangle', // 'rectangle', 'circle'
-      },
-
-      // The Director's Cut
-      snapshots: [],
-      userPresets: [],
-      animation: {
-        isPlaying: false,
-        mode: 'loop', // 'loop', 'pingpong', 'once'
-        bpm: 120, // Rhythm control (Future: sync with audio)
-        transitionTime: 2000, // ms. Replaces 'duration'. Safe default > 500ms
-        easing: 'easeInOut', // 'linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'
-        activeStep: 0,
-        strobeSafety: true, // Forces min transition time limit
-      },
-
-      // Flux State (Auto-Animation)
-      flux: {
-        enabled: false,
-      },
-
-      // LFO State (Parameter Modulation)
-      lfo: {
-        active: false,
-        oscillators: []
-      },
 
       setLfo: (key, value) => set((state) => ({
         lfo: { ...state.lfo, [key]: value }
       })),
 
-      // Audio Reactivity State
-      audio: {
-        enabled: false,
-        source: 'mic', // 'mic', 'file'
-        sensitivity: 1.0, // Master Gain
-        reactivity: {
-          bass: 1.0, // Log-Polar / Scale
-          mid: 1.0,  // Displacement
-          high: 1.0, // Color / Edge
+      setMidi: (key, value) => {
+        set((state) => {
+          const newState = { midi: { ...state.midi, [key]: value } }
+
+          // MIDI LEARN LOGIC
+          // If we receive a message 'lastMsg', and learn mode is active, map it!
+          if (key === 'lastMsg' && value && state.ui.midiLearnActive && state.ui.midiLearnId) {
+            const { channel, note, type } = value
+            // Create a unique ID for the control (e.g., "ch1-cc10" or "ch1-note60")
+            // actually, better to map FROM control TO param.
+            // But for lookup speed during performace, we want Map<MidiID, ParamPath>
+
+            // Mapping Key: `${channel}-${type}-${note}`
+            const mapKey = `${channel}-${type}-${note}`
+
+            // Update Mappings
+            newState.midi.mappings = {
+              ...state.midi.mappings,
+              [mapKey]: state.ui.midiLearnId
+            }
+
+            // Clear learn ID so we don't map same param twice immediately
+            // User must click another param to map another
+            newState.ui = { ...state.ui, midiLearnId: null }
+          }
+
+          // MIDI DRIVE LOGIC
+          // If we receive a message, check if it's mapped to something
+          if (key === 'lastMsg' && value) {
+            const mapKey = `${value.channel}-${value.type}-${value.note}`
+            const targetPath = state.midi.mappings[mapKey]
+
+            if (targetPath) {
+              // Update the target parameter
+              // targetPath is like "generator.param1" or "effects.bloom"
+              const [section, param] = targetPath.split('.')
+
+              // Scale and update
+              get().updateParamNormalized(section, param, value.value)
+            }
+          }
+
+          return newState
+        })
+      },
+
+      // Helper to update any param from a normalized 0-1 float
+      updateParamNormalized: (section, param, normalValue) => {
+        set((state) => {
+          // Find config for this param
+          // section might be "generator", "effects", etc.
+          const configSection = CONTROLS[section]
+          const configParam = configSection ? configSection[param] : null
+
+          let val = normalValue
+
+          if (configParam) {
+            const { min, max } = configParam
+            // Lerp
+            val = min + (max - min) * normalValue
+
+            // Optional: Step quantization if needed, but smooth is usually better for MIDI
+            // if (configParam.step) {
+            //   val = Math.round(val / configParam.step) * configParam.step
+            // }
+          } else {
+            // Fallback / heuristic if not in CONTROLS
+            // E.g. opacity is usually 0-1, rotation 0-360?
+            // Without config, we assume 0-1 or 0-100?
+            // Let's assume 0-1 if not found, or maybe 0-100 if it feels "large"?
+            // Safest is to just pass raw 0-1 if no config, but most things need scaling.
+            // We'll leave as 0-1
+          }
+
+          // Update the specific section
+          // We need to handle nested state updates carefully
+          return {
+            [section]: {
+              ...state[section],
+              [param]: val
+            }
+          }
+        })
+      },
+
+      setMidiMapping: (midiId, paramPath) => set((state) => ({
+        midi: {
+          ...state.midi,
+          mappings: { ...state.midi.mappings, [midiId]: paramPath }
         }
-      },
-
-      // MIDI State
-      midi: {
-        isEnabled: false,
-        inputs: [],
-        lastMsg: null, // { type: 'cc', channel: 1, note: 10, value: 0.5 }
-        mappings: {}   // Future: { 'cc-1-10': 'displacement.amp' }
-      },
-
-      setMidi: (key, value) => set((state) => ({
-        midi: { ...state.midi, [key]: value }
       })),
 
-      // UI State
-      ui: {
-        activeTab: 0, // 0=Generators, 1=Modifiers, 2=Global
-        layout: 'sidebar', // 'sidebar', 'floating', 'overlay' (future)
-        helpOpen: true,
-        controlsOpen: true,
-        exportRequest: null, // { width, height, filename }
-      },
+      clearMidiMapping: (midiId) => set((state) => {
+        const newMappings = { ...state.midi.mappings }
+        delete newMappings[midiId]
+        return { midi: { ...state.midi, mappings: newMappings } }
+      }),
 
       setUi: (key, value) => set((state) => ({
         ui: { ...state.ui, [key]: value }
       })),
 
+      stopAllMotion: () => set((state) => ({
+        generator: { ...state.generator, isAnimated: false },
+        animation: { ...state.animation, isPlaying: false },
+        flux: { ...state.flux, enabled: false },
+        audio: { ...state.audio, enabled: false },
+        lfo: { ...state.lfo, active: false }
+      })),
+
       toggleControls: (isOpen) => set((state) => ({ ui: { ...state.ui, controlsOpen: isOpen } })),
+      toggleHelp: (val) => set((state) => ({
+        ui: { ...state.ui, helpOpen: val !== undefined ? val : !state.ui.helpOpen }
+      })),
 
-      toggleHelp: () => set((state) => ({ ui: { ...state.ui, helpOpen: !state.ui.helpOpen } })),
+      // --- Actions ---
 
-      recording: { isActive: false, progress: 0 },
-
-      // Actions
       randomize: () => {
         get().pushHistory() // Auto-save
         set((state) => {
@@ -175,7 +261,9 @@ export const useStore = create(
             },
             symmetry: {
               enabled: Math.random() > 0.3,
+              type: state.symmetry.type,
               slices: symmetrySlices,
+              offset: state.symmetry.offset
             },
             warp: { type: warpType },
             displacement: {
@@ -194,6 +282,7 @@ export const useStore = create(
               feather: rng(0, 0.4),
             },
             color: {
+              ...state.color,
               posterize: Math.random() > 0.6 ? Math.floor(rng(4, 16)) : 256,
             },
             effects: {
@@ -312,44 +401,11 @@ export const useStore = create(
       })),
 
       setGenerator: (key, value) => {
-        console.log("setGenerator called:", key, value)
-        set((state) => {
-          console.log("Previous Gen:", state.generator)
-          return { generator: { ...state.generator, [key]: value } }
-        })
+        set((state) => ({ generator: { ...state.generator, [key]: value } }))
       },
 
       setCanvas: (key, value) => set((state) => ({
         canvas: { ...state.canvas, [key]: value }
-      })),
-
-      resetState: () => set((state) => ({
-        transforms: { x: 0, y: 0, scale: 1, rotation: 0 },
-        symmetry: { enabled: false, type: 'radial', slices: 6 },
-        warp: { type: 'none' },
-        displacement: { amp: 0, freq: 10 },
-        masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false, feather: 0.0 },
-        recording: { isActive: false, progress: 0 },
-        tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
-        tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
-        generator: { type: 'none', param1: 50, param2: 50, param3: 50, isAnimated: true },
-        color: { posterize: 32, r: 1, g: 1, b: 1, hue: 0, sat: 1, light: 1 },
-        effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0, bloom: 0, chromaticAberration: 0, noise: 0 },
-        flux: { enabled: false },
-        animation: { ...state.animation, isPlaying: false, transitionTime: 2000, mode: 'loop', easing: 'easeInOut', activeStep: 0 }
-      })),
-
-      resetForUpload: () => set((state) => ({
-        generator: { type: 'none', param1: 50, param2: 50, param3: 50, isAnimated: true },
-        tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
-        warp: { type: 'none' },
-        displacement: { amp: 0, freq: 10 },
-        warp: { type: 'none' },
-        displacement: { amp: 0, freq: 10 },
-        symmetry: { enabled: false, type: 'radial', slices: 6, offset: 0 },
-        effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0, bloom: 0, chromaticAberration: 0, noise: 0 },
-        effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0, bloom: 0, chromaticAberration: 0, noise: 0 },
-        transforms: { x: 0, y: 0, scale: 1, rotation: 0 },
       })),
 
       setFlux: (key, value) => set((state) => ({
@@ -360,11 +416,7 @@ export const useStore = create(
         return { audio: { ...state.audio, [key]: value } }
       }),
 
-      // History & Reset
-      history: [],
-
       pushHistory: () => set((state) => {
-        // Limit history to 20 steps
         const newHistory = [
           {
             transforms: { ...state.transforms },
@@ -392,33 +444,47 @@ export const useStore = create(
         }
       }),
 
-      resetParams: () => {
-        const { pushHistory } = get()
-        pushHistory() // Save before reset
-        set((state) => ({
-          transforms: { x: 0, y: 0, scale: 1, rotation: 0 },
-          symmetry: { enabled: false, type: 'radial', slices: 6, offset: 0 },
-          warp: { type: 'none' },
-          displacement: { amp: 0, freq: 10 },
-          masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false, feather: 0.0 },
-          tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
-          tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
-          generator: { type: 'none', param1: 50, param2: 50, param3: 50, isAnimated: true },
-          color: { posterize: 32, r: 1, g: 1, b: 1, hue: 0, sat: 1, light: 1 },
-          effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 0, bloom: 0, chromaticAberration: 0, noise: 0 },
-          flux: { enabled: false },
-          animation: { ...state.animation, isPlaying: false }
-        }))
-      },
-
-      // UI & Export
       triggerExport: (req) => set((state) => ({
         ui: { ...state.ui, exportRequest: req }
       })),
 
-      toggleHelp: (val) => set((state) => ({
-        ui: { ...state.ui, helpOpen: val !== undefined ? val : !state.ui.helpOpen }
-      }))
+      // --- RESET ACTIONS ---
+
+      // Soft Reset: Closes params but keeps global settings and timeline
+      resetParams: () => {
+        const { pushHistory } = get()
+        pushHistory()
+        set((state) => ({
+          transforms: { ...DEFAULTS.transforms },
+          symmetry: { ...DEFAULTS.symmetry },
+          warp: { ...DEFAULTS.warp },
+          displacement: { ...DEFAULTS.displacement },
+          masking: { ...DEFAULTS.masking },
+          tiling: { ...DEFAULTS.tiling },
+          generator: { ...DEFAULTS.generator },
+          color: { ...DEFAULTS.color },
+          effects: { ...DEFAULTS.effects },
+          flux: { ...DEFAULTS.flux },
+          animation: { ...state.animation, isPlaying: false } // Stop playing but keep timeline
+        }))
+      },
+
+      resetForUpload: () => set({
+        generator: { ...DEFAULTS.generator },
+        tiling: { ...DEFAULTS.tiling },
+        warp: { ...DEFAULTS.warp },
+        displacement: { ...DEFAULTS.displacement },
+        symmetry: { ...DEFAULTS.symmetry },
+        effects: { ...DEFAULTS.effects },
+        transforms: { ...DEFAULTS.transforms },
+      }),
+
+      // Factory Reset: Wipes EVERYTHING including user presets
+      resetAll: () => {
+        localStorage.clear() // Clear persistent storage
+        set({ ...DEFAULTS }) // Reset in-memory state
+      },
+
     }),
     {
       name: 'lumen-storage',
@@ -440,21 +506,21 @@ export const useStore = create(
         flux: state.flux,
         animation: state.animation,
         ui: state.ui,
+        midi: state.midi, // Persist MIDI mappings
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...persistedState,
-        // Deep merge nested objects to ensure new keys (like 'bloom' or 'audio') are present
-        // Deep merge nested objects to ensure new keys (like 'bloom' or 'audio') are present
+        // Deep merge config objects to ensure new keys appear if schema changes
         effects: { ...currentState.effects, ...(persistedState?.effects || {}) },
         audio: { ...currentState.audio, ...(persistedState?.audio || {}) },
         flux: { ...currentState.flux, ...(persistedState?.flux || {}) },
         ui: { ...currentState.ui, ...(persistedState?.ui || {}) },
+        midi: { ...currentState.midi, ...(persistedState?.midi || {}) },
         animation: { ...currentState.animation, ...(persistedState?.animation || {}) },
-        // Deep merge Symmetry & Generator to preserve new keys (type, isAnimated)
         symmetry: { ...currentState.symmetry, ...(persistedState?.symmetry || {}) },
         generator: { ...currentState.generator, ...(persistedState?.generator || {}) },
-        color: { ...currentState.color, ...(persistedState?.color || {}) }, // Add Color deep merge
+        color: { ...currentState.color, ...(persistedState?.color || {}) },
       }),
     }
   )

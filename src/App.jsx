@@ -3,6 +3,7 @@ import { CanvasGL } from './components/CanvasGL'
 import { Controls } from './components/Controls'
 import { HelpModal } from './components/HelpModal'
 import { useAnimator } from './hooks/useAnimator'
+import { useGamepad } from './hooks/useGamepad'
 import { useStore } from './store/useStore'
 import { midiManager } from './core/MidiManager'
 
@@ -10,13 +11,22 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
   useAnimator() // Hook for physics/animation loop (updates store)
+  useGamepad() // Hook for Xbox controller input
 
   useEffect(() => {
-    // Self-Repair: Check for corrupted state/missing keys from old saves
     const state = useStore.getState()
-    if (!state.audio || !state.flux || state.effects.bloom === undefined) {
+
+    // Startup Preference Check
+    if (state.ui.resumeOnStartup === false) {
+      console.log("Startup Preference: Start Fresh. Resetting state...")
+      state.resetAll()
+      // We need to re-fetch state after reset to ensure we have clean state for other checks if needed,
+      // but resetAll() sets state synchronously in Zustand.
+    }
+    // Self-Repair (Only needed if we didn't just reset)
+    else if (!state.audio || !state.flux || state.effects.bloom === undefined) {
       console.warn("Corrupted State detected. Performing Factory Reset.")
-      localStorage.clear()
+      state.resetAll()
       window.location.reload()
       return
     }

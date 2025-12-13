@@ -6,6 +6,7 @@ describe('Zustand Store', () => {
   // Reset store before each test to ensure isolation
   beforeEach(() => {
     act(() => {
+      useStore.getState().resetAll()
       useStore.setState({
         // Minimal reset to defaults relevant for testing
         transforms: { x: 0, y: 0, scale: 1, rotation: 0 },
@@ -60,15 +61,62 @@ describe('Zustand Store', () => {
   })
 
   it('should update post-processing effects', () => {
-    const { setEffects } = useStore.getState()
+    const { setEffect } = useStore.getState()
 
     act(() => {
-      setEffects('bloom', 0.8)
-      setEffects('noise', 0.2)
+      setEffect('bloom', 0.8)
+      setEffect('noise', 0.2)
     })
 
     const state = useStore.getState()
     expect(state.effects.bloom).toBe(0.8)
     expect(state.effects.noise).toBe(0.2)
+  })
+
+  // --- NEW TESTS ---
+
+  it('should reset all state to defaults when resetAll is called', () => {
+    const { setTransform, setAudio, resetAll } = useStore.getState()
+
+    // Modifying state
+    act(() => {
+      setTransform('scale', 5.0)
+      setAudio('enabled', true)
+    })
+
+    // Confirm change
+    let state = useStore.getState()
+    expect(state.transforms.scale).toBe(5.0)
+    expect(state.audio.enabled).toBe(true)
+
+    // Reset
+    act(() => {
+      resetAll()
+    })
+
+    // Verify Default State
+    state = useStore.getState()
+    expect(state.transforms.scale).toBe(1)
+    expect(state.audio.enabled).toBe(false)
+  })
+
+  it('should soft reset params but keep audio/global settings when resetParams is called', () => {
+    const { setTransform, setAudio, resetParams } = useStore.getState()
+
+    // Modifying state
+    act(() => {
+      setTransform('scale', 5.0)
+      setAudio('enabled', true)
+    })
+
+    // Soft Reset
+    act(() => {
+      resetParams()
+    })
+
+    // Verify State
+    const state = useStore.getState()
+    expect(state.transforms.scale).toBe(1) // Param should reset
+    expect(state.audio.enabled).toBe(true) // Audio (Global) should PERSIST
   })
 })

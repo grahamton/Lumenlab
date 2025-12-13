@@ -88,6 +88,11 @@ export function useAnimator() {
   }), [])
 
   const animate = useCallback(function animateFrame(time) {
+    if (useStore.getState().ui.globalPause) {
+      requestRef.current = requestAnimationFrame(animateFrame)
+      return
+    }
+
     if (!animation.isPlaying || snapshots.length < 2) {
       startTimeRef.current = null // Reset timing when paused
       requestRef.current = requestAnimationFrame(animateFrame)
