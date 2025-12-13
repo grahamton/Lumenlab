@@ -20,50 +20,61 @@ export function useAnimator() {
 
     if (!s1 || !s2) return s1 || s2
 
+    // Safety: Ensure subsections exist
+    const t1 = s1.transforms || {}; const t2 = s2.transforms || {}
+    const sym1 = s1.symmetry || {}; const sym2 = s2.symmetry || {}
+    const w1 = s1.warp || {}; const w2 = s2.warp || {}
+    const d1 = s1.displacement || {}; const d2 = s2.displacement || {}
+    const til1 = s1.tiling || {}; const til2 = s2.tiling || {}
+    const m1 = s1.masking || {}; const m2 = s2.masking || {}
+    const c1 = s1.color || {}; const c2 = s2.color || {}
+    const eff1 = s1.effects || {}; const eff2 = s2.effects || {}
+    const gen1 = s1.generator || {}; const gen2 = s2.generator || {}
+
     return {
       transforms: {
-        x: lerp(s1.transforms.x, s2.transforms.x, t),
-        y: lerp(s1.transforms.y, s2.transforms.y, t),
-        scale: lerp(s1.transforms.scale, s2.transforms.scale, t),
-        rotation: lerpAngle(s1.transforms.rotation, s2.transforms.rotation, t),
+        x: lerp(t1.x || 0, t2.x || 0, t),
+        y: lerp(t1.y || 0, t2.y || 0, t),
+        scale: lerp(t1.scale ?? 1, t2.scale ?? 1, t),
+        rotation: lerpAngle(t1.rotation || 0, t2.rotation || 0, t),
       },
       symmetry: {
-        enabled: s1.symmetry.enabled,
-        slices: Math.round(lerp(s1.symmetry.slices, s2.symmetry.slices, t)),
+        enabled: sym1.enabled,
+        slices: Math.round(lerp(sym1.slices || 6, sym2.slices || 6, t)),
       },
-      warp: { type: s1.warp.type },
+      warp: { type: w1.type || 'none' },
       displacement: {
-        amp: lerp(s1.displacement.amp, s2.displacement.amp, t),
-        freq: lerp(s1.displacement.freq, s2.displacement.freq, t),
+        amp: lerp(d1.amp || 0, d2.amp || 0, t),
+        freq: lerp(d1.freq || 10, d2.freq || 10, t),
       },
       tiling: {
-        type: s1.tiling.type,
-        scale: lerp(s1.tiling.scale, s2.tiling.scale, t),
-        overlap: lerp(s1.tiling.overlap, s2.tiling.overlap, t),
+        type: til1.type || 'none',
+        scale: lerp(til1.scale ?? 1, til2.scale ?? 1, t),
+        overlap: lerp(til1.overlap || 0, til2.overlap || 0, t),
       },
       masking: {
-        lumaThreshold: lerp(s1.masking.lumaThreshold, s2.masking.lumaThreshold, t),
-        centerRadius: lerp(s1.masking.centerRadius, s2.masking.centerRadius, t),
-        invertLuma: s1.masking.invertLuma,
-        feather: lerp(s1.masking.feather, s2.masking.feather, t),
+        lumaThreshold: lerp(m1.lumaThreshold || 0, m2.lumaThreshold || 0, t),
+        centerRadius: lerp(m1.centerRadius || 0, m2.centerRadius || 0, t),
+        invertLuma: m1.invertLuma,
+        feather: lerp(m1.feather || 0, m2.feather || 0, t),
       },
       color: {
-        posterize: lerp(s1.color.posterize, s2.color.posterize, t),
+        posterize: lerp(c1.posterize || 256, c2.posterize || 256, t),
       },
       effects: {
-        edgeDetect: lerp(s1.effects.edgeDetect, s2.effects.edgeDetect, t),
-        invert: lerp(s1.effects.invert, s2.effects.invert, t),
-        solarize: lerp(s1.effects.solarize, s2.effects.solarize, t),
-        shift: lerp(s1.effects.shift, s2.effects.shift, t),
-        bloom: lerp(s1.effects.bloom || 0, s2.effects.bloom || 0, t),
-        chromaticAberration: lerp(s1.effects.chromaticAberration || 0, s2.effects.chromaticAberration || 0, t),
-        noise: lerp(s1.effects.noise || 0, s2.effects.noise || 0, t),
+        edgeDetect: lerp(eff1.edgeDetect || 0, eff2.edgeDetect || 0, t),
+        invert: lerp(eff1.invert || 0, eff2.invert || 0, t),
+        solarize: lerp(eff1.solarize || 0, eff2.solarize || 0, t),
+        shift: lerp(eff1.shift || 0, eff2.shift || 0, t),
+        bloom: lerp(eff1.bloom || 0, eff2.bloom || 0, t),
+        chromaticAberration: lerp(eff1.chromaticAberration || 0, eff2.chromaticAberration || 0, t),
+        noise: lerp(eff1.noise || 0, eff2.noise || 0, t),
       },
       generator: {
-        type: s1.generator.type,
-        param1: lerp(s1.generator.param1, s2.generator.param1, t),
-        param2: lerp(s1.generator.param2, s2.generator.param2, t),
-        param3: lerp(s1.generator.param3, s2.generator.param3, t),
+        type: gen1.type || 'none',
+        param1: lerp(gen1.param1 ?? 50, gen2.param1 ?? 50, t),
+        param2: lerp(gen1.param2 ?? 50, gen2.param2 ?? 50, t),
+        param3: lerp(gen1.param3 ?? 50, gen2.param3 ?? 50, t),
       }
     }
   }, [])
@@ -115,7 +126,15 @@ export function useAnimator() {
     const progress = easeFn(rawT)
 
     // Determine Indices
-    const currIdx = animation.activeStep
+    let currIdx = animation.activeStep
+
+    // GUARD: Index out of bounds (e.g. after deletion)
+    if (currIdx >= snapshots.length || currIdx < 0) {
+      // Auto-correct to 0 and stop this frame to prevent crash
+      setAnimation('activeStep', 0)
+      return
+    }
+
     let nextIdx = currIdx + directionRef.current
 
     // Loop Logic (Wrap around)
@@ -127,13 +146,19 @@ export function useAnimator() {
       else { nextIdx = currIdx + 1; directionRef.current = 1 }
     }
 
-    // Index Safety
+    // Index Safety (Double Check)
     if (nextIdx >= snapshots.length) nextIdx = 0
     if (nextIdx < 0) nextIdx = 0
 
+    // GUARD: Ensure snapshots exist before accessing
+    const s1 = snapshots[currIdx]
+    const s2 = snapshots[nextIdx]
+
+    if (!s1 || !s2) return
+
     // Interpolate & Load
-    const currentState = interpolateState(snapshots[currIdx], snapshots[nextIdx], progress)
-    loadSnapshot(currentState)
+    const currentState = interpolateState(s1, s2, progress)
+    if (currentState) loadSnapshot(currentState)
 
     // Cycle Complete?
     if (elapsed >= safeDuration) {
