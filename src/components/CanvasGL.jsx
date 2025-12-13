@@ -173,8 +173,14 @@ function VisualizerScene() {
     // --- LFO LOGIC ---
     let lfoMods = { rotation: 0, scale: 0 } // Add more targets as needed
 
-    if (lfo.active) {
-      lfo.oscillators.forEach(osc => {
+    // Flux acts as a Master Switch for LFOs here
+    if (lfo.active || fluxEnabled) {
+      // Use defaults if empty (safety)
+      const oscillators = lfo.oscillators.length > 0 ? lfo.oscillators : [
+        { type: 'sine', target: 'transforms.scale', freq: 0.5, amp: 0.05, offset: 0 }
+      ]
+
+      oscillators.forEach(osc => {
         // Calculate Wave
         let val = 0
         const t = timeRef.current

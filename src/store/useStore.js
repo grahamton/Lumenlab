@@ -79,7 +79,11 @@ const DEFAULTS = {
   },
   lfo: {
     active: false,
-    oscillators: []
+    oscillators: [
+      // Default Heartbeat for Flux
+      { type: 'sine', target: 'transforms.scale', freq: 0.5, amp: 0.05, offset: 0 },
+      { type: 'sine', target: 'transforms.rotation', freq: 0.1, amp: 0.1, offset: 1 }
+    ]
   },
   audio: {
     enabled: false,
@@ -470,7 +474,7 @@ export const useStore = create(
       },
 
       resetForUpload: () => set({
-        generator: { ...DEFAULTS.generator },
+        generator: { ...DEFAULTS.generator, type: 'none' }, // FORCE NONE
         tiling: { ...DEFAULTS.tiling },
         warp: { ...DEFAULTS.warp },
         displacement: { ...DEFAULTS.displacement },

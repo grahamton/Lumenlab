@@ -51,5 +51,5 @@ This roadmap outlines major milestones and associated issues for future developm
 ## Milestone 8 – Beta Release & Feedback
 
 - [ ] **Feature freeze**: Stabilize the codebase and freeze features for the beta release.
-- [ ] **Bug tracking**: Create GitHub issues for known bugs; solicit feedback from early users.
-- [ ] **Feedback integration**: Prioritize and address critical feedback, focusing on stability, performance and usability.
+- [x] **Bug tracking**: Create GitHub issues for known bugs; solicit feedback from early users.
+- [x] **Feedback integration**: Prioritize and address critical feedback, focusing on stability, performance and usability.

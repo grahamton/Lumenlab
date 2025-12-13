@@ -275,19 +275,7 @@ void main() {
         coord.y += cos(coord.x * freq) * amp;
     }
 
-    // 4. Warp
-    if (uWarpType > 0.5) {
-        float r = length(coord);
-        float a = atan(coord.y, coord.x);
-
-        if (uWarpType < 1.5) { // Polar
-            coord = vec2(a / (2.0 * PI) + 0.5, r);
-        } else { // Log Polar
-            coord = vec2(a / (2.0 * PI) + 0.5, log(r + 0.0001));
-        }
-    }
-
-    // 5. Symmetry (Kaleidoscope)
+    // 4. Symmetry (Kaleidoscope) - NOW FIRST
     if (uSymEnabled) {
         if (uSymType < 0.5) { // 0: Radial (Default)
             float angle = atan(coord.y, coord.x);
@@ -300,6 +288,18 @@ void main() {
             coord.x = abs(coord.x - uSymOffset) + uSymOffset;
         } else { // 2: Mirror Y
             coord.y = abs(coord.y - uSymOffset) + uSymOffset;
+        }
+    }
+
+    // 5. Warp - NOW SECOND
+    if (uWarpType > 0.5) {
+        float r = length(coord);
+        float a = atan(coord.y, coord.x);
+
+        if (uWarpType < 1.5) { // Polar
+            coord = vec2(a / (2.0 * PI) + 0.5, r);
+        } else { // Log Polar
+            coord = vec2(a / (2.0 * PI) + 0.5, log(r + 0.0001));
         }
     }
 
