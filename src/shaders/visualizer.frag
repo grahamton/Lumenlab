@@ -331,6 +331,23 @@ void main() {
     vec4 texColor = getContent(coord);
     vec3 color = texColor.rgb;
 
+    // --- COLOR GRADING (RGB & HSL) ---
+
+    // 1. RGB Balance
+    color *= uColorRGB;
+
+    // 2. HSL Grading
+    if (uColorHSL.x != 0.0 || uColorHSL.y != 1.0 || uColorHSL.z != 1.0) {
+        vec3 hsb = rgb2hsb(color);
+        // Hue (Offset)
+        hsb.x = fract(hsb.x + uColorHSL.x);
+        // Saturation (Multiplier)
+        hsb.y = clamp(hsb.y * uColorHSL.y, 0.0, 1.0);
+        // Lightness (Multiplier on Brightness/Value)
+        hsb.z = clamp(hsb.z * uColorHSL.z, 0.0, 1.0);
+        color = hsb2rgb(hsb);
+    }
+
     // 8. Effects
 
     // Shift (NOW WORKS ON EVERYTHING)
