@@ -59,6 +59,7 @@
       "electron/**/*",
       "package.json"
     ],
+    "icon": "build/icon.png",
     "win": {
       "target": "nsis"
     },

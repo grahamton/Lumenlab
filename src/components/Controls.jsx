@@ -1,687 +1,557 @@
-import React, { useState, useEffect } from 'react'
+import React, { useRef } from 'react'
+import { CONTROLS } from '../config/uiConfig'
 import { useStore } from '../store/useStore'
-import { presets } from '../presets'
-import {
-  Zap, Sliders, Layers, Move, Hexagon, Waves, Activity, FolderOpen,
-  RefreshCw, Dices, ChevronDown, ChevronRight, Download, Save, Trash2, HelpCircle,
-  Camera, Play, Pause, PanelLeftClose, Maximize, Minimize, Mic
-} from 'lucide-react'
+import { CubeIcon, GridIcon, EyeIcon, SlidersIcon } from './Icons'
+import { Sliders, Activity, Monitor, Download, Maximize, RefreshCw, Layers, Zap, Undo2, RotateCcw, Power } from 'lucide-react'
 
-function ControlGroup({ label, value, min, max, step = 1, onChange, children, isCore = false }) {
-  return (
-    <div className="mb-3">
-      <div className="flex justify-between items-center mb-1">
-        <label className={`text-[10px] uppercase tracking-wider font-bold flex items-center gap-1 ${isCore ? 'text-cyan-400' : 'text-neutral-400'}`}>
-          {label}
-          {isCore && <span className="w-1 h-1 rounded-full bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,0.8)]"></span>}
-        </label>
-        <span className="text-[10px] text-neutral-500 font-mono">{Number(value).toFixed(step < 1 ? 2 : 0)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isCore ? 'bg-neutral-600 accent-cyan-400' : 'bg-neutral-700 accent-neutral-400 hover:accent-neutral-300'}`}
-      />
-      {children}
+// Minimal Control Components
+const ControlGroup = ({ label, value, min, max, onChange, step = 1 }) => (
+  <div className="flex flex-col gap-1 mb-3">
+    <div className="flex justify-between text-[10px] text-neutral-400 uppercase tracking-wider font-bold">
+      <span>{label}</span>
+      <span className="text-cyan-400 font-mono">{typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}</span>
     </div>
-  )
-}
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(parseFloat(e.target.value))}
+      className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-900"
+    />
+  </div>
+)
+
+const Toggle = ({ label, value, onChange }) => (
+  <div className="flex items-center justify-between mb-3 py-1">
+    <span className="text-[11px] text-neutral-400 font-medium">{label}</span>
+    <button
+      onClick={() => onChange(!value)}
+      className={`w-8 h-4 rounded-full transition-all relative ${value ? 'bg-cyan-900' : 'bg-neutral-800'}`}
+    >
+      <div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${value ? 'left-4.5 bg-cyan-400' : 'left-0.5 bg-neutral-500'}`} />
+    </button>
+  </div>
+)
+
+const TabButton = ({ icon: Icon, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`p-3 rounded-lg transition-all ${active ? 'bg-cyan-900/30 text-cyan-400' : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50'}`}
+  >
+    <Icon size={20} />
+  </button>
+)
 
 export function Controls() {
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [uiPresetTab, setUiPresetTab] = useState('default')
-  const [isCreatingPreset, setIsCreatingPreset] = useState(false)
-  const [newPresetName, setNewPresetName] = useState('')
-
   const store = useStore()
-  const {
-    ui, toggleControls,
-    setImage,
-    transforms, setTransform,
-    symmetry, setSymmetry,
-    warp, setWarp,
-    displacement, setDisplacement,
-    tiling, setTiling,
-    masking,
-    color, setColor,
-    effects, setEffects,
-    snapshots, addSnapshot, deleteSnapshot, loadSnapshot,
-    animation, setAnimation,
-    audio, setAudio,
-    toggleHelp,
-    resetState
-  } = useStore()
+  const { ui, setUi } = store
 
-  useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', handleFsChange)
-    return () => document.removeEventListener('fullscreenchange', handleFsChange)
-  }, [])
+  // Handlers for File Input
+  const fileInputRef = useRef(null)
 
-  // Global Hotkeys
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Ignore if typing in an input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
-
-      // TAB to toggle UI
-      if (e.key === 'Tab') {
-        e.preventDefault()
-        toggleControls(!ui.controlsOpen)
-      }
-
-      // SPACE: Play/Pause
-      if (e.code === 'Space') {
-        e.preventDefault()
-        const { animation, setAnimation } = useStore.getState()
-        setAnimation('isPlaying', !animation.isPlaying)
-      }
-
-      // R: Record
-      if (e.key.toLowerCase() === 'r') {
-        const { recording, setRecording } = useStore.getState()
-        setRecording('isActive', !recording.isActive)
-      }
-
-      // S: Snapshot
-      if (e.key.toLowerCase() === 's') {
-        useStore.getState().addSnapshot()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [ui.controlsOpen, toggleControls])
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-      }
-    }
-  }
-
-  const handleImageUpload = (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0]
-    if (!file) return
-
-    try {
-      e.target.value = null
-      const reader = new FileReader()
-
-      reader.onload = (event) => {
-        const isVideo = file.type.startsWith('video/')
-
-        if (isVideo) {
-          const video = document.createElement('video')
-          video.src = event.target.result
-          video.loop = true
-          video.muted = true
-          video.autoplay = true
-          video.playsInline = true
-          // Wait for metadata to ensure we have dimensions
-          video.onloadedmetadata = () => {
-            video.play().then(() => setImage(video)).catch(err => console.error("Video play failed", err))
-          }
-        } else {
-          const img = new Image()
-          img.onload = () => setImage(img)
-          img.onerror = () => alert("Error loading image.")
-          img.src = event.target.result
-        }
+    if (file) {
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        store.setImage(img)
+        store.resetForUpload() // Reset modifers so user sees the raw image
       }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      console.error(err)
-      alert("Unexpected error during upload.")
+      img.onerror = (err) => {
+        console.error("Failed to load image", err)
+        alert("Failed to load image. Please try another file.")
+      }
+      img.src = url
+      e.target.value = '' // Reset input to allow re-uploading the same file
     }
   }
 
-  const loadDemoImage = () => {
-    const img = new Image()
-    img.crossOrigin = "Anonymous"
-    img.onload = () => setImage(img)
-    img.onerror = () => alert("Failed to load demo image.")
-    img.src = "https://picsum.photos/1920/1080"
-  }
+  // Content for each Tab
 
-  const handleSaveProject = () => {
-    const data = {
-      version: 1,
-      timestamp: Date.now(),
-      state: {
-        transforms, symmetry, warp, displacement, masking,
-        tiling, color, effects, snapshots, generator: store.generator
-      }
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `lumen-project-${Date.now()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleLoadProject = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    e.target.value = null
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target.result)
-        if (data.state) {
-          useStore.setState(data.state)
-        }
-      } catch (err) {
-        console.error(err)
-        alert("Failed to load project file.")
-      }
-    }
-    reader.readAsText(file)
-  }
-
-  const handleExportPrint = () => {
-    const { width, height } = store.canvas
-    // Trigger WebGL Export via State
-    store.triggerExport({
-      width: 3840, // 4K default for "High Res"
-      height: 3840 * (height / width),
-      filename: `LumenLab_HighRes_${Date.now()}.png`
-    })
-  }
-
-  // Minimized View
-  if (!ui.controlsOpen) {
-    return (
-      <div className="absolute top-4 left-4 z-50">
-        <button
-          onClick={() => toggleControls(true)}
-          className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-lg border border-white/10 backdrop-blur-md transition-all shadow-xl group"
-          title="Show Controls (TAB)"
-        >
-          <ChevronRight size={20} className="group-hover:scale-110 transition-transform" />
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="absolute top-0 left-0 h-full w-80 bg-neutral-900/95 backdrop-blur-md border-r border-neutral-800 flex flex-col z-50 transition-transform duration-300 ease-in-out shadow-2xl">
-      {/* Header */}
-      <div className="p-4 border-b border-neutral-800 flex items-center justify-between shrink-0 bg-black/20">
-        <div className="flex items-center gap-2">
-          <Zap className="text-cyan-400 fill-cyan-400/20" size={20} />
-          <h1 className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">Lumen Lab</h1>
-        </div>
-        <div className="flex items-center gap-1">
-
-          <button onClick={() => store.randomize()} className="p-1.5 text-neutral-400 hover:text-cyan-400 rounded-md hover:bg-neutral-800 transition-colors" title="Randomize Parameters">
-            <Dices size={18} />
-          </button>
-          <button onClick={() => { if (confirm('Reset to default?')) resetState() }} className="p-1.5 text-neutral-400 hover:text-red-400 rounded-md hover:bg-neutral-800 transition-colors" title="Reset All">
-            <RefreshCw size={18} />
-          </button>
-          <div className="w-px h-4 bg-neutral-800 mx-1"></div>
-          <button onClick={() => toggleHelp(true)} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Help">
-            <HelpCircle size={18} />
-          </button>
-          <button onClick={toggleFullscreen} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Toggle Fullscreen">
-            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-          </button>
-          <div className="w-px h-4 bg-neutral-800 mx-1"></div>
-          <button onClick={() => toggleControls(false)} className="p-1.5 text-neutral-400 hover:text-white rounded-md hover:bg-neutral-800 transition-colors" title="Hide Controls (TAB)">
-            <PanelLeftClose size={18} />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-
-        {/* 1. Source */}
-        <Section
-          title="Source"
-          icon={<Activity size={14} />}
-          defaultOpen={true}
-          tooltip="Input Configuration. Toggle between uploading your own Image or using the Math Generator."
-        >
-          <div className="flex gap-2 mb-3 bg-neutral-800 p-1 rounded-lg">
-            <button onClick={() => store.setGenerator('type', 'none')} className={`text-xs flex-1 py-1.5 rounded-md transition-all font-medium ${store.generator.type === 'none' ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}>Image</button>
-            <button onClick={() => store.setGenerator('type', 'fibonacci')} className={`text-xs flex-1 py-1.5 rounded-md transition-all font-medium ${store.generator.type !== 'none' ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}>Math (Gen)</button>
-          </div>
-
-          {/* Preset Manager */}
-          <div className="mb-3 bg-neutral-800/50 rounded-lg p-2 border border-neutral-800">
-            <div className="flex gap-2 mb-2 p-0.5 bg-neutral-900 rounded">
-              <button onClick={() => setUiPresetTab('default')} className={`flex-1 py-1 text-[10px] rounded transition-colors ${uiPresetTab === 'default' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>Built-in</button>
-              <button onClick={() => setUiPresetTab('user')} className={`flex-1 py-1 text-[10px] rounded transition-colors ${uiPresetTab === 'user' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>My Presets</button>
-            </div>
-
-            {uiPresetTab === 'default' ? (
-              <div className="space-y-1">
-                {presets.map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => useStore.setState(p.state)}
-                    className="w-full text-left text-[10px] text-neutral-400 hover:text-cyan-400 hover:bg-neutral-800 px-2 py-1.5 rounded transition-colors flex items-center justify-between group"
-                  >
-                    {p.name}
-                    <ChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {!isCreatingPreset ? (
-                  <button
-                    onClick={() => setIsCreatingPreset(true)}
-                    className="w-full bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-800/50 py-1.5 rounded text-[10px] flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Save size={10} /> Save Current State
-                  </button>
-                ) : (
-                  <div className="bg-neutral-900 p-2 rounded border border-neutral-700 space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Preset Name..."
-                      className="w-full bg-neutral-800 text-white text-[10px] p-1.5 rounded border border-neutral-600 outline-none focus:border-cyan-500 transition-colors"
-                      value={newPresetName}
-                      onChange={(e) => setNewPresetName(e.target.value)}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newPresetName.trim()) {
-                          store.saveUserPreset(newPresetName.trim())
-                          setNewPresetName('')
-                          setIsCreatingPreset(false)
-                        }
-                        if (e.key === 'Escape') setIsCreatingPreset(false)
-                      }}
-                    />
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => {
-                          if (newPresetName.trim()) {
-                            store.saveUserPreset(newPresetName.trim())
-                            setNewPresetName('')
-                            setIsCreatingPreset(false)
-                          }
-                        }}
-                        disabled={!newPresetName.trim()}
-                        className="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white py-1 rounded text-[10px] disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setIsCreatingPreset(false)}
-                        className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-neutral-300 py-1 rounded text-[10px]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
-                  {store.userPresets && store.userPresets.length > 0 ? (
-                    store.userPresets.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between bg-neutral-900/50 p-1.5 rounded text-[10px] group border border-transparent hover:border-neutral-700">
-                        <button onClick={() => useStore.setState(p.state)} className="flex-1 text-left truncate text-neutral-300 hover:text-white mr-2">
-                          {p.name}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete preset?')) store.deleteUserPreset(p.id) }} className="text-neutral-600 hover:text-red-400 p-1 rounded hover:bg-neutral-800">
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-[10px] text-neutral-600 text-center py-2 italic">No saved presets</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {store.generator.type === 'none' ? (
-            <div className="space-y-2">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
-                <input type="file" accept="image/*,video/*" onChange={handleImageUpload} className="block w-full text-[10px] text-neutral-400 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-neutral-800 file:text-cyan-500 hover:file:bg-neutral-700 cursor-pointer" />
-              </div>
-              <button onClick={loadDemoImage} className="text-xs w-full py-1.5 text-neutral-500 hover:text-neutral-300 transition-colors flex items-center gap-1 justify-center"><Zap size={10} /> Load Demo Image</button>
-            </div>
-          ) : (
-            <div>
-              <div className="grid grid-cols-3 gap-1 mb-3">
-                {['fibonacci', 'voronoi', 'grid', 'liquid', 'plasma'].map(t => (
-                  <button key={t} onClick={() => store.setGenerator('type', t)} className={`text-[10px] py-2 rounded capitalize border transition-all ${store.generator.type === t ? 'bg-cyan-900/30 text-cyan-200 border-cyan-800' : 'bg-neutral-800 text-neutral-500 border-transparent hover:border-neutral-700'}`}>{t}</button>
-                ))}
-              </div>
-              <div className="bg-neutral-800/30 p-2 rounded border border-neutral-800 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-1"><Sliders size={10} /> Tuning</div>
-                {store.generator.type === 'fibonacci' && (
-                  <>
-                    <ControlGroup label="Density" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                    <ControlGroup label="Zoom" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                  </>
-                )}
-                {store.generator.type === 'voronoi' && (
-                  <>
-                    <ControlGroup label="Cells" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                    <ControlGroup label="Bubble Size" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                  </>
-                )}
-                {store.generator.type === 'liquid' && (
-                  <>
-                    <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                    <ControlGroup label="Flow Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                  </>
-                )}
-                {store.generator.type === 'plasma' && (
-                  <>
-                    <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                    <ControlGroup label="Flux Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                  </>
-                )}
-                {store.generator.type === 'grid' && (
-                  <>
-                    <ControlGroup label="Spacing" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
-                    <ControlGroup label="Thickness" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
-                    <ControlGroup label="Blur / Blend" value={store.generator.param3} min={1} max={100} onChange={(v) => store.setGenerator('param3', v)} />
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </Section>
-
-        {/* 2. Geometry */}
-        <Section
-          title="Geometry"
-          icon={<Hexagon size={14} />}
-          tooltip="Shape & Space. Controls for Scale, Rotation, Symmetry (Kaleidoscope), Tiling, and Distortion."
-        >
-          {/* Base Transforms */}
-          <ControlGroup isCore={true} label="Scale" value={transforms.scale} min={0.1} max={3} step={0.01} onChange={(v) => setTransform('scale', v)} />
-          <ControlGroup isCore={true} label="Rotation" value={Math.round(transforms.rotation * (180 / Math.PI))} min={0} max={360} onChange={(v) => setTransform('rotation', v * (Math.PI / 180))} />
-
-          {/* Kaleidoscope */}
-          <div className="border-t border-neutral-800 my-2 pt-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-neutral-400">Kaleidoscope</span>
-              <div className="flex bg-neutral-800 rounded p-0.5">
-                <button onClick={() => setSymmetry('enabled', false)} className={`px-2 py-0.5 rounded text-[10px] ${!symmetry.enabled ? 'bg-neutral-600 text-white' : 'text-neutral-500'}`}>Off</button>
-                <button onClick={() => setSymmetry('enabled', true)} className={`px-2 py-0.5 rounded text-[10px] ${symmetry.enabled ? 'bg-cyan-600 text-white' : 'text-neutral-500'}`}>On</button>
-              </div>
-            </div>
-            {symmetry.enabled && (
-              <ControlGroup label="Slices" value={symmetry.slices} min={2} max={32} step={2} onChange={(v) => setSymmetry('slices', v)} />
-            )}
-          </div>
-
-          {/* Tiling */}
-          <div className="border-t border-neutral-800 my-2 pt-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-neutral-400">Tiling</span>
-            </div>
-            <div className="flex gap-1 mb-2">
-              {['none', 'p1', 'p2', 'p4m'].map((type) => {
-                const labels = { 'none': 'Off', 'p1': 'Grid', 'p2': 'Spin', 'p4m': 'Mirror' }
-                return (
-                  <button key={type} onClick={() => setTiling('type', type)} className={`text-[10px] py-1 px-2 rounded capitalize transition-colors flex-1 ${tiling.type === type ? 'bg-cyan-700 text-white' : 'bg-neutral-800 text-neutral-500'}`}>{labels[type]}</button>
-                )
-              })}
-            </div>
-            {tiling.type !== 'none' && (
-              <ControlGroup label="Grid Scale" value={tiling.scale} min={0.1} max={2.0} step={0.01} onChange={(v) => setTiling('scale', v)} />
-            )}
-          </div>
-
-          {/* Distortion / Warp */}
-          {/* Distortion / Warp */}
-          <div className="border-t border-neutral-800 my-2 pt-2">
-            <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Distortion</span>
-            <div className="flex gap-1 mb-2">
-              {[{ id: 'none', label: 'None' }, { id: 'polar', label: 'Tunnel' }, { id: 'log-polar', label: 'Vortex' }].map((opt) => (
-                <button key={opt.id} onClick={() => setWarp('type', opt.id)} className={`text-[10px] py-1 px-2 rounded capitalize flex-1 ${warp.type === opt.id ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-500'}`}>{opt.label}</button>
-              ))}
-            </div>
-            <ControlGroup
-              label="Liquefy Strength"
-              value={Math.round(Math.sqrt(displacement.amp / 400) * 100)}
-              min={0}
-              max={100}
-              onChange={(v) => {
-                const curved = (v / 100) * (v / 100) * 400; // Increased range from 200 to 400
-                setDisplacement('amp', curved);
-              }}
-            />
-          </div>
-        </Section>
-
-        {/* 3. Animation */}
-        <Section
-          title="Animation"
-          icon={<Waves size={14} />}
-          tooltip="Motion & Time. Control Flux (auto-animation) and Snapshots."
-        >
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={() => store.setRecording('isActive', !store.recording.isActive)}
-              className={`py-2 px-3 rounded text-xs flex-1 flex items-center justify-center gap-2 border transition-all ${store.recording.isActive
-                ? 'bg-red-600 text-white border-red-500 animate-pulse'
-                : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'
-                }`}
-            >
-              <div className={`w-2 h-2 rounded-full ${store.recording.isActive ? 'bg-white' : 'bg-red-500'}`} />
-              {store.recording.isActive ? `${(store.recording.progress / 1000).toFixed(1)}s` : 'Record'}
-            </button>
-            <button
-              onClick={() => store.setFlux('enabled', !store.flux.enabled)}
-              className={`py-2 px-3 rounded text-xs flex-1 flex items-center justify-center gap-2 border ${store.flux.enabled
-                ? 'bg-purple-900/50 text-purple-200 border-purple-700/50 hover:bg-purple-800'
-                : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'
-                }`}
-            >
-              <Activity size={14} /> Flux
-            </button>
-          </div>
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={addSnapshot}
-              className="bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-700/50 py-2 px-3 rounded text-xs flex-1 flex items-center justify-center gap-2"
-            >
-              <Camera size={14} /> Snapshot
-            </button>
-            <button
-              onClick={() => setAnimation('isPlaying', !animation.isPlaying)}
-              className={`py-2 px-3 rounded text-xs flex-1 flex items-center justify-center gap-2 border ${animation.isPlaying
-                ? 'bg-red-900/50 text-red-200 border-red-700/50 hover:bg-red-800'
-                : 'bg-green-900/50 text-green-200 border-green-700/50 hover:bg-green-800'
-                }`}
-            >
-              {animation.isPlaying ? <Pause size={14} /> : <Play size={14} />}
-              {animation.isPlaying ? 'Stop' : 'Play'}
-            </button>
-          </div>
-
-          {snapshots.length > 0 && (
-            <div className="mb-3 space-y-1 max-h-32 overflow-y-auto custom-scrollbar bg-black/20 rounded p-1">
-              {snapshots.map((snap, idx) => (
-                <div key={snap.id} className="flex items-center justify-between bg-neutral-900/80 p-2 rounded text-xs group hover:bg-neutral-800 transition-colors cursor-pointer border border-transparent hover:border-neutral-600">
-                  <span onClick={() => loadSnapshot(snap)} className="truncate w-full hover:text-cyan-400">Snapshot {idx + 1}</span>
-                  <button onClick={(e) => { e.stopPropagation(); deleteSnapshot(idx) }} className="text-neutral-600 hover:text-red-400 pl-2"><Trash2 size={12} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="bg-neutral-800/50 p-2 rounded-lg">
-            <ControlGroup isCore={true} label="Morph Speed (ms)" value={animation.duration} min={500} max={10000} step={100} onChange={(v) => setAnimation('duration', v)} />
-            <ControlGroup label="Hold Time (ms)" value={animation.holdTime || 0} min={0} max={5000} step={100} onChange={(v) => setAnimation('holdTime', v)} />
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-neutral-400">Easing</span>
-                <select value={animation.easing || 'linear'} onChange={(e) => setAnimation('easing', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
-                  <option value="linear">Linear</option>
-                  <option value="easeInOut">Smooth</option>
-                  <option value="elastic">Elastic</option>
-                  <option value="bounce">Bounce</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-neutral-400">Loop Mode</span>
-                <select value={animation.mode} onChange={(e) => setAnimation('mode', e.target.value)} className="bg-neutral-900 border border-neutral-700 text-xs rounded p-1 text-neutral-300 outline-none">
-                  <option value="loop">Loop</option>
-                  <option value="pingpong">Ping Pong</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </Section>
-
-        {/* 4. Audio Reactivity */}
-        <Section
-          title="Audio Reactivity"
-          icon={<Mic size={14} />}
-          tooltip="Make the visuals dance to sound. Creates an audio feedback loop for some parameters."
-        >
-          <div className="mb-3">
-            <button
-              onClick={() => {
-                if (!audio.enabled) {
-                  // Request permission implicitly by enabling
-                  setAudio('enabled', true)
-                } else {
-                  setAudio('enabled', false)
-                }
-              }}
-              className={`w-full py-2 px-3 rounded text-xs flex items-center justify-center gap-2 border transition-all ${audio.enabled
-                ? 'bg-red-900/50 text-red-100 border-red-500 animate-pulse-slow shadow-[0_0_15px_rgba(220,38,38,0.3)]'
-                : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'
-                }`}
-            >
-              <Mic size={14} className={audio.enabled ? "animate-bounce" : ""} />
-              {audio.enabled ? "Listening (Mic Active)" : "Enable Microphone Input"}
-            </button>
-          </div>
-
-          {audio.enabled && (
-            <div className="space-y-3 bg-neutral-800/30 p-2 rounded-lg border border-neutral-800/50">
-              <ControlGroup label="Master Gain" value={audio.sensitivity} min={0} max={3.0} step={0.1} onChange={(v) => setAudio('sensitivity', v)} />
-
-              <div className="border-t border-neutral-700/50 pt-2 mt-2">
-                <span className="text-[10px] uppercase font-bold text-neutral-500 mb-2 block">Band Reactivity</span>
-                <ControlGroup label="Bass (Scale)" value={audio.reactivity.bass} min={0} max={3.0} step={0.1} onChange={(v) => setAudio('reactivity', { ...audio.reactivity, bass: v })} />
-                <ControlGroup label="Mids (Displace)" value={audio.reactivity.mid} min={0} max={3.0} step={0.1} onChange={(v) => setAudio('reactivity', { ...audio.reactivity, mid: v })} />
-                <ControlGroup label="Highs (FX)" value={audio.reactivity.high} min={0} max={3.0} step={0.1} onChange={(v) => setAudio('reactivity', { ...audio.reactivity, high: v })} />
-              </div>
-            </div>
-          )}
-        </Section>
-
-        {/* 4. Color & Brightness */}
-        <Section
-          title="Color & Brightness"
-          icon={<Zap size={14} />}
-          tooltip="Post-processing effects, Color grading, and Alchemy."
-        >
-          <ControlGroup isCore={true} label="Invert" value={effects.invert} min={0} max={100} onChange={(v) => setEffects('invert', v)} />
-          <ControlGroup label="Neon Edge" value={effects.edgeDetect} min={0} max={100} onChange={(v) => setEffects('edgeDetect', v)} />
-          <ControlGroup label="Solarize" value={effects.solarize} min={0} max={100} onChange={(v) => setEffects('solarize', v)} />
-          <ControlGroup label="RGB Shift" value={effects.shift} min={0} max={100} onChange={(v) => setEffects('shift', v)} />
-          <div className="mt-2">
-            <ControlGroup label={`Posterize (Levels: ${color.posterize < 256 ? color.posterize : 'Off'})`} value={color.posterize} min={2} max={256} onChange={(v) => setColor('posterize', v)} />
-          </div>
-
-          <div className="border-t border-neutral-800 my-2 pt-2">
-            <span className="text-[10px] uppercase font-bold text-neutral-600 mb-1 block">Camera Effects (Post-Process)</span>
-            <ControlGroup label="Glow (Bloom)" value={effects.bloom || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('bloom', v)} />
-            <ControlGroup label="Glitch (Aberration)" value={effects.chromaticAberration || 0} min={0} max={1} step={0.01} onChange={(v) => setEffects('chromaticAberration', v)} />
-            <ControlGroup label="Film Grain (Noise)" value={effects.noise || 0} min={0} max={0.5} step={0.01} onChange={(v) => setEffects('noise', v)} />
-          </div>
-        </Section>
-
-        {/* 5. Output & View */}
-        <Section
-          title="Output & View"
-          icon={<FolderOpen size={14} />}
-          tooltip="Canvas settings, file management, and export."
-        >
-          <div className="flex items-center justify-between text-xs mb-3">
-            <span className="text-neutral-400">Portal Mode</span>
-            <div className="flex bg-neutral-800 rounded p-0.5">
-              <button onClick={() => store.setCanvas('shape', 'rectangle')} className={`px-3 py-1 rounded transition-colors ${store.canvas.shape !== 'circle' ? 'bg-neutral-600 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}>Rect</button>
-              <button onClick={() => store.setCanvas('shape', 'circle')} className={`px-3 py-1 rounded transition-colors ${store.canvas.shape === 'circle' ? 'bg-cyan-600 text-white shadow-[0_0_10px_rgba(8,145,178,0.5)]' : 'text-neutral-500 hover:text-neutral-300'}`}>Circle</button>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 gap-1 mb-4">
-            {[{ id: 'video', label: '16:9' }, { id: 'portrait', label: '9:16' }, { id: 'square', label: '1:1' }, { id: 'free', label: 'Full' }].map((opt) => (
-              <button key={opt.id} onClick={() => {
-                const { setCanvas } = useStore.getState()
-                setCanvas('aspect', opt.id)
-                if (opt.id === 'video') { setCanvas('width', 1920); setCanvas('height', 1080) }
-                if (opt.id === 'portrait') { setCanvas('width', 1080); setCanvas('height', 1920) }
-                if (opt.id === 'square') { setCanvas('width', 1080); setCanvas('height', 1080) }
-                if (opt.id === 'free') { setCanvas('width', window.innerWidth); setCanvas('height', window.innerHeight) }
-              }} className={`text-[10px] py-1 rounded transition-colors ${store.canvas.aspect === opt.id ? 'bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700'}`}>{opt.label}</button>
-            ))}
-          </div>
-
-          <div className="flex gap-2 mb-2">
-            <button onClick={handleSaveProject} className="flex-1 bg-neutral-800 hover:bg-neutral-700 py-2 rounded text-xs flex items-center justify-center gap-2 text-neutral-300"><Save size={12} /> Save</button>
-            <label className="flex-1 bg-neutral-800 hover:bg-neutral-700 py-2 rounded text-xs flex items-center justify-center gap-2 cursor-pointer text-neutral-300"><FolderOpen size={12} /> Load <input type="file" accept=".json" onChange={handleLoadProject} className="hidden" /></label>
-          </div>
-          <button onClick={handleExportPrint} className="w-full bg-neutral-100 hover:bg-white text-black py-2 rounded text-xs flex items-center justify-center gap-2 font-bold shadow-lg shadow-white/10 mb-2"><Download size={14} /> Export 4K Image</button>
-
+  // TAB 0: SOURCE (Uploads, Generator Type, Generator Key Params)
+  const renderSource = () => (
+    <div className="space-y-6">
+      {/* Media Source */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <label className="text-xs text-neutral-500 font-bold uppercase tracking-wider block mb-2">Media Source</label>
+        <div className="flex gap-2">
           <button
-            onClick={() => { if (confirm('Reset all parameters to default?')) resetState() }}
-            className="w-full border border-red-900/30 text-red-400 hover:bg-red-900/20 py-2 rounded text-xs flex items-center justify-center gap-2 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] uppercase font-bold rounded border border-neutral-700 transition-colors flex items-center justify-center gap-2"
           >
-            <RefreshCw size={12} /> Reset All Parameters
+            <Download className="rotate-180" size={12} /> Upload
           </button>
-        </Section>
+          <button
+            onClick={store.randomize}
+            className="flex-1 py-2 bg-gradient-to-r from-purple-900/40 to-cyan-900/40 hover:from-purple-900/60 hover:to-cyan-900/60 text-cyan-200 text-[10px] uppercase font-bold rounded border border-white/10 transition-colors flex items-center justify-center gap-2"
+            title="Randomize Parameters"
+          >
+            <Zap size={12} /> Randomize
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
 
+      <div className="space-y-3">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs text-neutral-500 font-bold uppercase tracking-wider block">Generator Type</label>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-neutral-500 font-bold uppercase">Animate</span>
+            <Toggle label="" value={store.generator.isAnimated ?? true} onChange={(v) => store.setGenerator('isAnimated', v)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {['fibonacci', 'voronoi', 'grid', 'liquid', 'plasma', 'fractal'].map(t => (
+            <button
+              key={t}
+              onClick={() => store.setGenerator('type', t)}
+              className={`text-[10px] py-2 rounded border transition-all capitalize ${store.generator.type === t ? 'bg-cyan-900/20 text-cyan-300 border-cyan-800/50' : 'bg-neutral-900 text-neutral-500 border-neutral-800 hover:border-neutral-700'}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {/* Generator Params (Context Aware) */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-cyan-400 font-bold uppercase tracking-wider mb-4">
+          <Activity size={12} /> Generator Params
+        </div>
+
+        {store.generator.type === 'fibonacci' && (
+          <>
+            <ControlGroup label="Density" step={1} value={store.generator.param1} min={1} max={200} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label="Zoom" step={0.1} value={store.generator.param2} min={0.1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup label="Speed" step={1} value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+          </>
+        )}
+        {store.generator.type === 'voronoi' && (
+          <>
+            <ControlGroup label={CONTROLS.generator.param1.label} value={store.generator.param1} min={CONTROLS.generator.param1.min} max={CONTROLS.generator.param1.max} step={CONTROLS.generator.param1.step} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label={CONTROLS.generator.param2.label} value={store.generator.param2} min={CONTROLS.generator.param2.min} max={CONTROLS.generator.param2.max} step={CONTROLS.generator.param2.step} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup label={CONTROLS.generator.param3.label} value={store.generator.param3} min={CONTROLS.generator.param3.min} max={CONTROLS.generator.param3.max} step={CONTROLS.generator.param3.step} onChange={(v) => store.setGenerator('param3', v)} />
+          </>
+        )}
+        {store.generator.type === 'grid' && (
+          <>
+            <ControlGroup label="Spacing" value={store.generator.param1} min={10} max={200} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label="Thickness" value={store.generator.param2} min={1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup label="Blur" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+          </>
+        )}
+        {store.generator.type === 'liquid' && (
+          <>
+            <ControlGroup label="Scale" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+          </>
+        )}
+        {store.generator.type === 'plasma' && (
+          <>
+            <ControlGroup label="Frequency" value={store.generator.param1} min={1} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label="Speed" value={store.generator.param2} min={1} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+          </>
+        )}
+        {store.generator.type === 'fractal' && (
+          <>
+            <ControlGroup label="Scale" value={store.generator.param1} min={0} max={100} onChange={(v) => store.setGenerator('param1', v)} />
+            <ControlGroup label="Detail" value={store.generator.param2} min={0} max={100} onChange={(v) => store.setGenerator('param2', v)} />
+            <ControlGroup label="Turbulence" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+          </>
+        )}
       </div>
     </div>
   )
-}
 
-function Section({ title, icon, children, defaultOpen = false, tooltip }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  return (
-    <div className="border border-neutral-700 rounded-lg bg-neutral-800/50 relative"> {/* Removed overflow-hidden */}
-      <div className={`flex items-center justify-between p-3 bg-neutral-900/30 transition-all ${isOpen ? 'rounded-t-lg' : 'rounded-lg'}`}>
-        <button onClick={() => setIsOpen(!isOpen)} className="flex-1 flex items-center gap-2 text-xs font-bold text-neutral-300 hover:text-white transition-colors text-left">
-          {icon} <span>{title}</span>
-        </button>
-        <div className="flex items-center gap-2">
-          {tooltip && (
-            <div className="group relative flex items-center">
-              <HelpCircle size={12} className="text-neutral-600 hover:text-neutral-400 cursor-help" />
-              {/* Tooltip: Increased z-index, width, and removed pointer-events-none conditionally if needed, but keeping it simple */}
-              <div className="absolute right-0 top-6 w-64 p-3 bg-neutral-950 border border-neutral-700 rounded-lg text-xs leading-relaxed text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[100] shadow-2xl backdrop-blur-md">
-                {tooltip}
-                <div className="absolute top-0 right-1.5 -translate-y-1/2 w-2 h-2 bg-neutral-950 border-t border-l border-neutral-700 rotate-45"></div>
-              </div>
-            </div>
-          )}
-          <button onClick={() => setIsOpen(!isOpen)} className="text-neutral-500 hover:text-white transition-colors">
-            {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </button>
+  // TAB 1: GEOMETRY (Transforms, Tiling, Symmetry, Warp)
+  const renderGeometry = () => (
+    <div className="space-y-6">
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-orange-400 font-bold uppercase tracking-wider mb-4">
+          <Layers size={12} /> Transforms
+        </div>
+        <ControlGroup label={CONTROLS.transforms.scale.label} step={CONTROLS.transforms.scale.step} value={store.transforms.scale} min={CONTROLS.transforms.scale.min} max={CONTROLS.transforms.scale.max} onChange={(v) => store.setTransform('scale', v)} />
+        <ControlGroup label={CONTROLS.transforms.rotation.label} step={CONTROLS.transforms.rotation.step} value={store.transforms.rotation} min={CONTROLS.transforms.rotation.min} max={CONTROLS.transforms.rotation.max} onChange={(v) => store.setTransform('rotation', v)} />
+        <ControlGroup label={CONTROLS.transforms.x.label} step={CONTROLS.transforms.x.step} value={store.transforms.x} min={CONTROLS.transforms.x.min} max={CONTROLS.transforms.x.max} onChange={(v) => store.setTransform('x', v)} />
+        <ControlGroup label={CONTROLS.transforms.y.label} step={CONTROLS.transforms.y.step} value={store.transforms.y} min={CONTROLS.transforms.y.min} max={CONTROLS.transforms.y.max} onChange={(v) => store.setTransform('y', v)} />
+      </div>
+
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-purple-400 font-bold uppercase tracking-wider mb-4">
+          <GridIcon size={12} /> Tiling
+        </div>
+        <div className="mb-4">
+          <div className="flex gap-1 mb-2">
+            {['none', 'p1', 'p2', 'p4m'].map(m => (
+              <button
+                key={m}
+                onClick={() => store.setTiling('type', m)}
+                className={`flex-1 py-1 text-[10px] uppercase rounded border ${store.tiling.type === m ? 'bg-purple-900/30 text-purple-300 border-purple-800' : 'bg-neutral-800 text-neutral-500 border-neutral-800'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <ControlGroup label="Tile Scale" step={0.1} value={store.tiling.scale} min={0.1} max={5.0} onChange={(v) => store.setTiling('scale', v)} />
         </div>
       </div>
-      {isOpen && (
-        <div className="p-3 pt-0 border-t border-neutral-700/50 bg-black/20 rounded-b-lg">
-          <div className="pt-3 space-y-3">{children}</div>
+
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-rose-400 font-bold uppercase tracking-wider mb-4">
+          <RefreshCw size={12} /> Symmetry & Distortion
         </div>
-      )}
+        <Toggle label="Enable Symmetry" value={store.symmetry.enabled} onChange={(v) => store.setSymmetry('enabled', v)} />
+
+        {store.symmetry.enabled && (
+          <div className="mb-2">
+            <div className="flex gap-1 mb-2">
+              {['radial', 'mirrorX', 'mirrorY'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => store.setSymmetry('type', t)}
+                  className={`flex-1 py-1 text-[9px] uppercase rounded border ${store.symmetry.type === t ? 'bg-rose-900/30 text-rose-300 border-rose-800' : 'bg-neutral-800 text-neutral-500 border-neutral-800'}`}
+                >
+                  {t.replace('mirror', 'Mirror ')}
+                </button>
+              ))}
+            </div>
+            {store.symmetry.type === 'radial' && (
+              <ControlGroup label={CONTROLS.symmetry.slices.label} value={store.symmetry.slices} min={CONTROLS.symmetry.slices.min} max={CONTROLS.symmetry.slices.max} step={CONTROLS.symmetry.slices.step} onChange={(v) => store.setSymmetry('slices', v)} />
+            )}
+          </div>
+        )}
+
+        {/* Liquify / Displacement */}
+        <div className="mt-4 pt-4 border-t border-neutral-800">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-[10px] text-neutral-500 font-bold uppercase">Liquify</label>
+          </div>
+          <ControlGroup label={CONTROLS.displacement.amp.label} value={store.displacement.amp} min={CONTROLS.displacement.amp.min} max={CONTROLS.displacement.amp.max} step={CONTROLS.displacement.amp.step} onChange={(v) => store.setDisplacement('amp', v)} />
+          <ControlGroup label={CONTROLS.displacement.freq.label} value={store.displacement.freq} min={CONTROLS.displacement.freq.min} max={CONTROLS.displacement.freq.max} step={CONTROLS.displacement.freq.step} onChange={(v) => store.setDisplacement('freq', v)} />
+        </div>
+
+        {/* Warp */}
+        <div className="mt-4 pt-4 border-t border-neutral-800">
+          <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">Warp Type</label>
+          <div className="flex gap-1 mb-2">
+            {['none', 'polar', 'log-polar'].map(w => (
+              <button
+                key={w}
+                onClick={() => store.setWarp('type', w)}
+                className={`flex-1 py-1 text-[10px] xs uppercase rounded border ${store.warp.type === w ? 'bg-rose-900/30 text-rose-300 border-rose-800' : 'bg-neutral-800 text-neutral-500 border-transparent'}`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  // TAB 2: EFFECTS (Color, Audio, Post-Process)
+  const renderEffects = () => (
+    <div className="space-y-6">
+      {/* Color */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-yellow-400 font-bold uppercase tracking-wider mb-4">
+          <Zap size={12} /> Color Grading
+        </div>
+
+        {/* Posterize */}
+        <ControlGroup label={CONTROLS.color.posterize.label} value={store.color.posterize} min={CONTROLS.color.posterize.min} max={CONTROLS.color.posterize.max} step={CONTROLS.color.posterize.step} onChange={(v) => store.setColor('posterize', v)} />
+
+        {/* RGB Balance */}
+        <div className="mt-4 pt-4 border-t border-neutral-800">
+          <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">RGB Balance</label>
+          <div className="grid grid-cols-3 gap-2">
+            <ControlGroup label="R" value={store.color.r} min={CONTROLS.color.r.min} max={CONTROLS.color.r.max} step={CONTROLS.color.r.step} onChange={(v) => store.setColor('r', v)} />
+            <ControlGroup label="G" value={store.color.g} min={CONTROLS.color.g.min} max={CONTROLS.color.g.max} step={CONTROLS.color.g.step} onChange={(v) => store.setColor('g', v)} />
+            <ControlGroup label="B" value={store.color.b} min={CONTROLS.color.b.min} max={CONTROLS.color.b.max} step={CONTROLS.color.b.step} onChange={(v) => store.setColor('b', v)} />
+          </div>
+        </div>
+
+        {/* HSL */}
+        <div className="mt-4 pt-4 border-t border-neutral-800">
+          <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">HSL</label>
+          <ControlGroup label={CONTROLS.color.hue.label} value={store.color.hue} min={CONTROLS.color.hue.min} max={CONTROLS.color.hue.max} step={CONTROLS.color.hue.step} onChange={(v) => store.setColor('hue', v)} />
+          <ControlGroup label={CONTROLS.color.sat.label} value={store.color.sat} min={CONTROLS.color.sat.min} max={CONTROLS.color.sat.max} step={CONTROLS.color.sat.step} onChange={(v) => store.setColor('sat', v)} />
+          <ControlGroup label={CONTROLS.color.light.label} value={store.color.light} min={CONTROLS.color.light.min} max={CONTROLS.color.light.max} step={CONTROLS.color.light.step} onChange={(v) => store.setColor('light', v)} />
+        </div>
+      </div>
+
+      {/* Audio Reactivity */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-xs text-pink-500 font-bold uppercase">
+            <Activity size={12} /> Audio Reactivity
+          </div>
+          <Toggle label="" value={store.audio.enabled} onChange={(v) => store.setAudio('enabled', v)} />
+        </div>
+        {store.audio.enabled && (
+          <ControlGroup label="Sensitivity" step={0.1} value={store.audio.sensitivity} min={0.1} max={5.0} onChange={(v) => store.setAudio('sensitivity', v)} />
+        )}
+      </div>
+
+      {/* Post Processing */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold uppercase tracking-wider mb-4">
+          <Monitor size={12} /> Post Processing
+        </div>
+        <ControlGroup label="Bloom" step={0.1} value={store.effects.bloom} min={0} max={3} onChange={(v) => store.setEffect('bloom', v)} />
+        <ControlGroup label="Chromatic Aberration" value={store.effects.chromaticAberration} min={0} max={50} onChange={(v) => store.setEffect('chromaticAberration', v)} />
+        <ControlGroup label="Noise" step={0.01} value={store.effects.noise} min={0} max={1} onChange={(v) => store.setEffect('noise', v)} />
+
+        {/* Shader Effects (0-100) */}
+        <ControlGroup label="Invert" step={1} value={store.effects.invert} min={0} max={100} onChange={(v) => store.setEffect('invert', v)} />
+        <ControlGroup label="Solarize" step={1} value={store.effects.solarize} min={0} max={100} onChange={(v) => store.setEffect('solarize', v)} />
+        <ControlGroup label="RGB Shift" step={1} value={store.effects.shift} min={0} max={100} onChange={(v) => store.setEffect('shift', v)} />
+      </div>
+    </div>
+  )
+
+  // TAB 3: GLOBAL (Animation, Sequencer, Output)
+  const renderGlobal = () => (
+    <div className="space-y-6">
+      {/* Animation & Sequencer */}
+      {/* Advanced Sequencer & Animation */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-cyan-400 font-bold uppercase tracking-wider mb-4">
+          <Activity size={12} /> Sequencer
+        </div>
+
+        {/* Transport Bar */}
+        <div className="flex items-center justify-between mb-4 bg-black/40 p-2 rounded-lg border border-neutral-800">
+          <button
+            onClick={() => store.setAnimation('isPlaying', !store.animation.isPlaying)}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${store.animation.isPlaying ? 'bg-cyan-500 text-black shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+          >
+            {store.animation.isPlaying ? <div className="w-3 h-3 bg-black rounded-sm" /> : <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-current border-b-[6px] border-b-transparent ml-1" />}
+          </button>
+
+          <div className="flex flex-col flex-1 mx-3 gap-1">
+            <div className="flex justify-between text-[9px] text-neutral-500 uppercase font-bold">
+              <span>Mode</span>
+              <span className="text-cyan-400">{store.animation.mode}</span>
+            </div>
+            <div className="flex bg-neutral-800 rounded p-0.5">
+              {['loop', 'pingpong', 'once'].map(m => (
+                <button
+                  key={m}
+                  onClick={() => store.setAnimation('mode', m)}
+                  className={`flex-1 text-[8px] py-1 uppercase rounded ${store.animation.mode === m ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Timeline Strip */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[9px] text-neutral-500 font-bold uppercase">Timeline</span>
+            <div className="flex gap-2">
+              <button onClick={store.addSnapshot} className="text-[9px] text-cyan-400 hover:text-cyan-300 font-bold uppercase">+ Add Step</button>
+            </div>
+          </div>
+
+          <div className="flex gap-1 overflow-x-auto pb-2 custom-scrollbar min-h-[40px] bg-black/20 p-1 rounded border border-neutral-800/50">
+            {store.snapshots.map((snap, i) => (
+              <div
+                key={snap.id}
+                onClick={() => {
+                  store.loadSnapshot(snap)
+                  store.setAnimation('activeStep', i)
+                }}
+                className={`relative group flex-shrink-0 w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold cursor-pointer transition-all border ${store.animation.activeStep === i ? 'bg-cyan-900/50 border-cyan-500 text-cyan-300 scale-105 shadow-md' : 'bg-neutral-800 border-neutral-700 text-neutral-500 hover:border-neutral-500'}`}
+              >
+                {i + 1}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    store.deleteSnapshot(i)
+                  }}
+                  className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  title="Delete Step"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {store.snapshots.length === 0 && <span className="text-[9px] text-neutral-700 italic w-full text-center py-2">No steps recorded</span>}
+          </div>
+        </div>
+
+        {/* Transition Controls */}
+        <div className="space-y-3 pt-3 border-t border-neutral-800">
+          {/* Speed / Duration */}
+          <ControlGroup
+            label="Transition Time (ms)"
+            step={100}
+            value={store.animation.transitionTime}
+            min={100}
+            max={10000}
+            onChange={(v) => store.setAnimation('transitionTime', v)}
+          />
+          {store.animation.strobeSafety && store.animation.transitionTime < 500 && (
+            <div className="text-[9px] text-yellow-500 font-mono bg-yellow-900/20 p-1 rounded border border-yellow-900/50 mb-2">
+              ⚠ Safety Limit: Clamped to 500ms
+            </div>
+          )}
+
+          {/* Easing & Safety */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[9px] text-neutral-500 font-bold uppercase block mb-1">Flow / Easing</label>
+              <select
+                value={store.animation.easing}
+                onChange={(e) => store.setAnimation('easing', e.target.value)}
+                className="w-full bg-neutral-800 text-[10px] text-neutral-300 p-1.5 rounded border border-neutral-700 outline-none focus:border-cyan-500"
+              >
+                <option value="linear">Linear (Robot)</option>
+                <option value="easeInOut">Smooth (Natural)</option>
+                <option value="bounce">Bounce</option>
+                <option value="elastic">Elastic</option>
+              </select>
+            </div>
+            <div className="flex flex-col justify-end">
+              <div className="flex items-center gap-2 p-1.5 bg-neutral-800 rounded border border-neutral-700" title="Prevents seizure-inducing speeds">
+                <input
+                  type="checkbox"
+                  checked={store.animation.strobeSafety}
+                  onChange={(e) => store.setAnimation('strobeSafety', e.target.checked)}
+                  className="accent-cyan-500"
+                />
+                <span className="text-[9px] text-neutral-400 font-bold uppercase">Safety</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-blue-400 font-bold uppercase tracking-wider mb-4">
+          <Download size={12} /> Output
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button onClick={() => store.triggerExport({ width: 1920, height: 1080, filename: 'lumen_hd.png' })} className="py-2 bg-neutral-800 hover:bg-neutral-700 text-xs rounded text-neutral-300">Save 1080p</button>
+          <button onClick={() => store.triggerExport({ width: 3840, height: 2160, filename: 'lumen_4k.png' })} className="py-2 bg-neutral-800 hover:bg-neutral-700 text-xs rounded text-neutral-300">Save 4K</button>
+        </div>
+
+        <div className="mb-4 pt-4 border-t border-neutral-800">
+          <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">Projection Shape</label>
+          <div className="flex gap-1">
+            {['rectangle', 'circle'].map(s => (
+              <button
+                key={s}
+                onClick={() => store.setCanvas('shape', s)}
+                className={`flex-1 py-1 text-[10px] uppercase rounded border ${store.canvas.shape === s ? 'bg-blue-900/30 text-blue-300 border-blue-800' : 'bg-neutral-800 text-neutral-500 border-neutral-800'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Toggle label="Show Help on Start" value={store.ui.helpOpen} onChange={store.toggleHelp} />
+        </div>
+      </div>
+    </div>
+  )
+
+  // Layout Styles
+  const isFloating = ui.layout === 'floating'
+
+  const containerClasses = isFloating
+    ? `fixed right-4 top-4 w-72 bg-neutral-950/90 backdrop-blur rounded-xl border border-white/10 flex flex-col z-50 shadow-2xl max-h-[90vh] transition-all duration-300 ${!ui.controlsOpen ? 'translate-x-[120%] opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`
+    : `fixed right-0 top-0 h-full w-80 bg-neutral-950 border-l border-neutral-900 flex flex-col z-50 shadow-2xl transition-all duration-300 ${!ui.controlsOpen ? 'translate-x-full' : 'translate-x-0'}`
+
+  return (
+    <div className={containerClasses}>
+      {/* Layout Toggle (Mini Header) */}
+      <div className="flex items-center justify-between gap-1 p-2 border-b border-neutral-900/50 bg-neutral-950/50">
+
+        {/* History / Reset Controls */}
+        <div className="flex gap-1">
+          <button
+            onClick={store.undo}
+            disabled={store.history?.length === 0}
+            className={`p-1.5 rounded transition-all ${store.history?.length > 0 ? 'text-cyan-400 hover:bg-neutral-800' : 'text-neutral-700 cursor-not-allowed'}`}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 size={14} />
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Reset all parameters to default?')) store.resetParams()
+            }}
+            className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all"
+            title="Reset Parameters (Soft Reset)"
+          >
+            <RotateCcw size={14} />
+          </button>
+        </div>
+
+        {/* Layout Switcher */}
+        <div className="flex bg-neutral-900 rounded p-0.5">
+          {['sidebar', 'floating'].map(l => (
+            <button
+              key={l}
+              onClick={() => setUi('layout', l)}
+              className={`px-2 py-0.5 text-[8px] uppercase tracking-wider font-bold rounded ${ui.layout === l ? 'bg-neutral-800 text-cyan-400 shadow-sm' : 'text-neutral-600 hover:text-neutral-400'}`}
+            >
+              {l === 'sidebar' ? 'RAIL' : 'FLOAT'}
+            </button>
+          ))}
+        </div>
+
+        {/* Hard Reset */}
+        <button
+          onClick={() => {
+            if (confirm('FACTORY RESET? This will wipe all data and reload.')) {
+              localStorage.clear()
+              window.location.reload()
+            }
+          }}
+          className="p-1.5 rounded text-red-900 hover:text-red-500 hover:bg-red-900/20 transition-all"
+          title="Factory Reset (Hard Reload)"
+        >
+          <Power size={14} />
+        </button>
+      </div>
+
+      {/* Tab Bar */}
+      <div className={`flex items-center justify-around p-2 ${!isFloating && 'border-b border-neutral-900 bg-neutral-950'}`}>
+        <TabButton icon={CubeIcon} active={ui.activeTab === 0} onClick={() => setUi('activeTab', 0)} />
+        <TabButton icon={GridIcon} active={ui.activeTab === 1} onClick={() => setUi('activeTab', 1)} />
+        <TabButton icon={Zap} active={ui.activeTab === 2} onClick={() => setUi('activeTab', 2)} />
+        <TabButton icon={EyeIcon} active={ui.activeTab === 3} onClick={() => setUi('activeTab', 3)} />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        {ui.activeTab === 0 && renderSource()}
+        {ui.activeTab === 1 && renderGeometry()}
+        {ui.activeTab === 2 && renderEffects()}
+        {ui.activeTab === 3 && renderGlobal()}
+      </div>
+
+      {/* Footer / Logo Area */}
+      <div className="p-4 border-t border-neutral-900/50 text-center">
+        <h1 className="text-xs font-bold text-neutral-600 tracking-[0.2em] uppercase">Lumen Lab <span className="text-cyan-900">v0.6</span></h1>
+      </div>
     </div>
   )
 }

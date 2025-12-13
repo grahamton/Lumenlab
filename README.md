@@ -22,7 +22,8 @@
 -   **Universal Input**: Drag & drop Images or Video (`.mp4`) files.
 -   **Audio Reactivity**: Visuals pulse and shift to your microphone or music input.
 -   **Generative Engines**: Built-in mathematical generators like Fibonacci, Voronoi, Liquid, and Plasma.
--   **Pro Effects Stack**: Bloom, Chromatic Aberration, Noise, and Color Grading.
+-   **Advanced Symmetry**: Radial, Mirror X, and Mirror Y modes with offset control.
+-   **Pro Effects Stack**: Bloom, Glitch, Noise, and Analog Color Grading (RGB/HSL).
 -   **Preset Manager**: Save your own custom configurations or choose from 10+ built-in styles.
 -   **Autosave**: Never lose your flow—the app remembers exactly where you left off.
 -   **Capture**: Record sessions to `.webm` or take 4K Snapshots.
@@ -38,8 +39,8 @@
 ### 1. The Controls
 -   **Source**: Drag & drop an image or Video, or select a Generator (Liquid, Plasma, etc.).
 -   **Audio**: Click the Mic icon to enable Audio Reactivity. Watch the visuals dance!
--   **Geometry**: Turn on **Kaleidoscope** or **Tiling** to make it infinite.
--   **Effects**: Use **Liquefy** to melt the screen or **Advanced Effects** (Bloom, Glitch) for polish.
+-   **Geometry**: Turn on **Kaleidoscope** or **Mirror Symmetry** to make it infinite.
+-   **Effects**: Use **Liquefy** to melt the screen or **Color Grading** to tint and tune the vibe.
 
 ### 2. Projector Mode (Performance)
 -   **Full Screen**: Press **F** or click the resize icon.
@@ -59,6 +60,14 @@
     ```bash
     npm run dist
     ```
+    ```bash
+    npm run dist
+    ```
+3.  **Configuration**:
+    -   Tune UI sliders (min/max/step) in `src/config/uiConfig.js`.
+4.  **Roadmap**:
+    See [ROADMAP.md](./ROADMAP.md) for future plans and milestones.
+
 
 ---
 

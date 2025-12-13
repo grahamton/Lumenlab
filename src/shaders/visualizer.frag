@@ -3,6 +3,7 @@ varying vec2 vUv;
 uniform sampler2D uTexture;
 uniform vec2 uResolution;
 uniform float uTime;
+uniform float uGenTime; // New: Generator specific time
 uniform float uAspect; // Canvas Aspect Ratio
 uniform float uImageAspect; // Image Aspect Ratio
 uniform float uShape; // 0=Rect, 1=Circle
@@ -13,6 +14,8 @@ uniform vec4 uTransforms; // x, y, scale, rotation
 // Symmetry
 uniform bool uSymEnabled;
 uniform float uSymSlices;
+uniform float uSymType; // 0=Radial, 1=MirrorX, 2=MirrorY
+uniform float uSymOffset;
 
 // Warp & Distortion
 uniform float uWarpType; // 0=none, 1=polar, 2=log-polar
@@ -24,25 +27,85 @@ uniform float uTilingScale;
 
 // Color & Effects
 uniform float uPosterize;
+uniform vec3 uColorRGB; // r, g, b multiplier
+uniform vec3 uColorHSL; // h (offset), s (mult), l (mult)
 uniform vec4 uEffects; // edge, invert, solarize, shift
 
 // Generator
-uniform float uGenType; // 0=none, 1=fib, 2=voronoi, 3=grid, 4=liquid, 5=plasma
+uniform float uGenType; // 0=none, 1=fib, 2=voronoi, 3=grid, 4=liquid, 5=plasma, 6=fractal
 uniform vec3 uGenParams; // p1, p2, p3
 
 #define PI 3.14159265359
 
-// --- GENERATORS ---
+// --- NOISE & MATH HELPERS ---
 float random (in vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
+
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+vec3 rgb2hsb( in vec3 c ){
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsb2rgb( in vec3 c ){
+    vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+    return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}
+
+float snoise(vec2 v){
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+           -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy) );
+  vec2 x0 = v -   i + dot(i, C.xx);
+  vec2 i1;
+  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+  + i.x + vec3(0.0, i1.x, 1.0 ));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+  m = m*m ;
+  m = m*m ;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+float fbm(in vec2 st) {
+    // Initial values
+    float value = 0.0;
+    float amplitude = .5;
+    float frequency = 0.0;
+    // Loop of octaves
+    for (int i = 0; i < 6; i++) {
+        value += amplitude * snoise(st);
+        st *= 2.;
+        amplitude *= .5;
+    }
+    return value;
+}
+
+// --- GENERATORS ---
 
 vec3 fibonacciSpiral(vec2 uv) {
     vec2 center = uv - 0.5;
     float dist = length(center);
     float angle = atan(center.y, center.x);
     float r = dist * uGenParams.y; // Zoom
-    float theta = angle + uTime * 0.1;
+    float theta = angle + uGenTime * 0.1;
     float spiral = sin(10.0 * log(r + 0.0001) + theta * uGenParams.x); // Density
     float val = smoothstep(-0.2, 0.2, spiral);
     return vec3(val);
@@ -58,7 +121,7 @@ vec3 voronoi(vec2 uv) {
         for (int x= -1; x <= 1; x++) {
             vec2 neighbor = vec2(float(x),float(y));
             vec2 point = vec2(random(i_st + neighbor));
-            point = 0.5 + 0.5*sin(uTime*0.5 + 6.2831*point);
+            point = 0.5 + 0.5*sin(uGenTime*0.5 + 6.2831*point);
             vec2 diff = neighbor + point - f_st;
             float dist = length(diff);
             m_dist = min(m_dist, dist);
@@ -91,45 +154,16 @@ vec3 basicGrid(vec2 uv) {
     return vec3(1.0 - min(lineX, lineY));
 }
 
-// Simplex 2D noise
-vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
-
-float snoise(vec2 v){
-  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-           -0.577350269189626, 0.024390243902439);
-  vec2 i  = floor(v + dot(v, C.yy) );
-  vec2 x0 = v -   i + dot(i, C.xx);
-  vec2 i1;
-  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-  vec4 x12 = x0.xyxy + C.xxzz;
-  x12.xy -= i1;
-  i = mod(i, 289.0);
-  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
-  + i.x + vec3(0.0, i1.x, 1.0 ));
-  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-  m = m*m ;
-  m = m*m ;
-  vec3 x = 2.0 * fract(p * C.www) - 1.0;
-  vec3 h = abs(x) - 0.5;
-  vec3 ox = floor(x + 0.5);
-  vec3 a0 = x - ox;
-  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-  vec3 g;
-  g.x  = a0.x  * x0.x  + h.x  * x0.y;
-  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-  return 130.0 * dot(m, g);
-}
-
 vec3 liquid(vec2 uv) {
     vec2 st = uv * uGenParams.x * 0.05;
-    float n = snoise(st + uTime * uGenParams.y * 0.002); // Flow
+    float n = snoise(st + uGenTime * uGenParams.y * 0.002); // Flow
     // Layering
-    n += 0.5 * snoise(st * 2.0 - uTime * 0.2);
+    n += 0.5 * snoise(st * 2.0 - uGenTime * 0.2);
     float val = smoothstep(0.2, 0.8, n + 0.5);
     // Colorize
     return vec3(
-        val * sin(uTime + n),
-        val * cos(uTime + n),
+        val * sin(uGenTime + n),
+        val * cos(uGenTime + n),
         val
     );
 }
@@ -137,20 +171,52 @@ vec3 liquid(vec2 uv) {
 vec3 plasma(vec2 uv) {
     vec2 st = uv * uGenParams.x * 0.1;
     float v = 0.0;
-    v += sin((st.x + uTime * 0.5));
-    v += sin((st.y + uTime) / 2.0);
-    v += sin((st.x + st.y + uTime) / 2.0);
-    vec2 c = st + vec2(sin(uTime), cos(uTime));
+    v += sin((st.x + uGenTime * 0.5));
+    v += sin((st.y + uGenTime) / 2.0);
+    v += sin((st.x + st.y + uGenTime) / 2.0);
+    vec2 c = st + vec2(sin(uGenTime), cos(uGenTime));
     v += sin(length(c) * (uGenParams.y * 0.1));
 
     // Map -something to 0..1
     v = v / 4.0;
 
     return vec3(
-        0.5 + 0.5 * sin(PI * v + uTime),
-        0.5 + 0.5 * sin(PI * v + uTime + 2.0),
-        0.5 + 0.5 * sin(PI * v + uTime + 4.0)
+        0.5 + 0.5 * sin(PI * v + uGenTime),
+        0.5 + 0.5 * sin(PI * v + uGenTime + 2.0),
+        0.5 + 0.5 * sin(PI * v + uGenTime + 4.0)
     );
+}
+
+vec3 fractalNoise(vec2 uv) {
+    // scale
+    vec2 st = uv * uGenParams.x * 0.05;
+
+    // time/speed (Param 3)
+    vec2 q = vec2(0.);
+    q.x = fbm(st + 0.00 * uGenTime);
+    q.y = fbm(st + vec2(1.0));
+
+    vec2 r = vec2(0.);
+    r.x = fbm(st + 1.0 * q + vec2(1.7, 9.2) + 0.15 * uGenTime * (uGenParams.z * 0.1));
+    r.y = fbm(st + 1.0 * q + vec2(8.3, 2.8) + 0.126 * uGenTime * (uGenParams.z * 0.1));
+
+    float f = fbm(st + r);
+
+    // Colorize based on detailed noise
+    vec3 color = mix(vec3(0.101961,0.619608,0.666667),
+                     vec3(0.666667,0.666667,0.498039),
+                     clamp((f*f)*4.0,0.0,1.0));
+
+    color = mix(color,
+                vec3(0,0,0.164706),
+                clamp(length(q),0.0,1.0));
+
+    color = mix(color,
+                vec3(0.666667,1,1),
+                clamp(length(r.x),0.0,1.0));
+
+    // Param 2: Intensity/Contrast or Detail modification
+    return color * (uGenParams.y * 0.02 + 0.5);
 }
 
 // --- CONTENT FETCHER ---
@@ -161,7 +227,8 @@ vec4 getContent(vec2 uv) {
         else if (uGenType < 2.5) gen = voronoi(uv);
         else if (uGenType < 3.5) gen = basicGrid(uv);
         else if (uGenType < 4.5) gen = liquid(uv);
-        else gen = plasma(uv);
+        else if (uGenType < 5.5) gen = plasma(uv);
+        else gen = fractalNoise(uv);
         return vec4(gen, 1.0);
     } else {
         // Bounds check inside fetcher
@@ -204,8 +271,8 @@ void main() {
     if (uDisplacement.x > 0.0) {
         float freq = uDisplacement.y * 10.0;
         float amp = uDisplacement.x * 0.001;
-        coord.x += sin(coord.y * freq + uTime) * amp;
-        coord.y += cos(coord.x * freq + uTime) * amp;
+        coord.x += sin(coord.y * freq) * amp;
+        coord.y += cos(coord.x * freq) * amp;
     }
 
     // 4. Warp
@@ -222,12 +289,18 @@ void main() {
 
     // 5. Symmetry (Kaleidoscope)
     if (uSymEnabled) {
-        float angle = atan(coord.y, coord.x);
-        float radius = length(coord);
-        float slice = (2.0 * PI) / uSymSlices;
-        angle = mod(angle, slice);
-        angle = abs(angle - slice * 0.5); // Mirror within slice
-        coord = vec2(cos(angle) * radius, sin(angle) * radius);
+        if (uSymType < 0.5) { // 0: Radial (Default)
+            float angle = atan(coord.y, coord.x);
+            float radius = length(coord);
+            float slice = (2.0 * PI) / uSymSlices;
+            angle = mod(angle, slice);
+            angle = abs(angle - slice * 0.5); // Mirror within slice
+            coord = vec2(cos(angle) * radius, sin(angle) * radius);
+        } else if (uSymType < 1.5) { // 1: Mirror X
+            coord.x = abs(coord.x - uSymOffset) + uSymOffset;
+        } else { // 2: Mirror Y
+            coord.y = abs(coord.y - uSymOffset) + uSymOffset;
+        }
     }
 
     // 6. Transform (Inverse applied to texture coords)

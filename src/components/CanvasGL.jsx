@@ -17,10 +17,10 @@ function VisualizerScene() {
   const image = useStore((state) => state.image)
   const exportRequest = useStore((state) => state.ui.exportRequest)
   const triggerExport = useStore((state) => state.triggerExport)
-  const fluxEnabled = useStore((state) => state.flux.enabled)
+  const fluxEnabled = useStore((state) => state.flux?.enabled)
   const shape = useStore((state) => state.canvas.shape)
   // Audio State
-  const audio = useStore((state) => state.audio)
+  const audio = useStore((state) => state.audio || {})
 
   // Recording State from Store (Triggers)
   const recordingState = useStore((state) => state.recording)
@@ -28,6 +28,7 @@ function VisualizerScene() {
 
   const { gl, size } = useThree()
   const timeRef = useRef(0)
+  const genTimeRef = useRef(0)
   const imageAspect = useRef(1)
 
   // Hooks
@@ -62,14 +63,19 @@ function VisualizerScene() {
     uImageAspect: { value: 1.0 }, // New: Image Aspect
     uShape: { value: 0 }, // New: 0=Rect, 1=Circle
     uTime: { value: 0 },
+    uGenTime: { value: 0 }, // New: Generator specific time
     uTransforms: { value: new THREE.Vector4(0, 0, 1, 0) }, // x, y, scale, rotation
     uSymEnabled: { value: false },
     uSymSlices: { value: 6 },
+    uSymType: { value: 0 }, // 0=Radial, 1=MirrorX, 2=MirrorY
+    uSymOffset: { value: 0 },
     uWarpType: { value: 0 }, // 0=none, 1=polar, 2=log
     uDisplacement: { value: new THREE.Vector2(0, 10) },
     uTilingType: { value: 0 }, // 0=none
     uTilingScale: { value: 1 },
     uPosterize: { value: 256 },
+    uColorRGB: { value: new THREE.Vector3(1, 1, 1) },
+    uColorHSL: { value: new THREE.Vector3(0, 1, 1) },
     uEffects: { value: new THREE.Vector4(0, 0, 0, 0) }, // edge, invert, solarize, shift
     uGenType: { value: 0 },
     uGenParams: { value: new THREE.Vector3(50, 50, 50) },
@@ -127,14 +133,18 @@ function VisualizerScene() {
     const uniformValues = uniforms
     const {
       transforms, symmetry, warp, displacement, tiling,
-      color, effects, generator, audio: audioState
+      color, effects, generator, audio: audioState, lfo, animation
     } = useStore.getState() // Access fresh state without re-render
 
-    // Flux Time Logic
-    if (fluxEnabled) {
-      timeRef.current += delta
-    }
+    // Time Logic: Always translate global time
+    timeRef.current += delta
     uniformValues.uTime.value = timeRef.current
+
+    // Generator Time Logic: Only advance if animated
+    if (generator.isAnimated !== false) { // Default to true if undefined
+      genTimeRef.current += delta
+    }
+    uniformValues.uGenTime.value = genTimeRef.current
 
     // Audio Analysis
     let bass = 0, mid = 0, high = 0
@@ -143,31 +153,67 @@ function VisualizerScene() {
       // Normalize 0-255 to 0-1 range
       // Apply sensitivity
       const sens = audioState.sensitivity
+      // Safe access to reactivity defaults in case of partial state
+      const rBass = audioState.reactivity?.bass ?? 1.0
+      const rMid = audioState.reactivity?.mid ?? 1.0
+      const rHigh = audioState.reactivity?.high ?? 1.0
+
       bass = (freq.low / 255) * sens
       mid = (freq.mid / 255) * sens
       high = (freq.high / 255) * sens
     }
 
+    // Audio Uniforms
     uniformValues.uAudioLow.value = bass
     uniformValues.uAudioMid.value = mid
     uniformValues.uAudioHigh.value = high
 
-    // Reactive Modifications (in-shader or here? Let's do here for some, shader for texture fx)
-    // Actually, modulating uniforms here is very powerful.
+    // --- LFO LOGIC ---
+    let lfoMods = { rotation: 0, scale: 0 } // Add more targets as needed
+
+    if (lfo.active) {
+      lfo.oscillators.forEach(osc => {
+        // Calculate Wave
+        let val = 0
+        const t = timeRef.current
+        // Basic Waveforms
+        if (osc.type === 'sine') val = Math.sin(t * osc.freq * Math.PI * 2 + osc.offset)
+        else if (osc.type === 'square') val = Math.sign(Math.sin(t * osc.freq * Math.PI * 2 + osc.offset))
+        else if (osc.type === 'triangle') val = Math.asin(Math.sin(t * osc.freq * Math.PI * 2 + osc.offset)) / (Math.PI / 2)
+        else if (osc.type === 'saw') val = (t * osc.freq + osc.offset / (Math.PI * 2)) % 1.0 * 2 - 1
+
+        // Scale by Amp
+        val *= osc.amp
+
+        // Apply to Targets (Mapping)
+        // Ideally this should be a robust map, for now hardcoding common ones
+        if (osc.target === 'transforms.rotation') lfoMods.rotation += val
+        if (osc.target === 'transforms.scale') lfoMods.scale += val
+      })
+    }
+
+    // --- UNIFORM UPDATES ---
 
     // Example: Bass hits scale
-    const reactiveScale = transforms.scale + (bass * audioState.reactivity.bass * 0.2)
+    const rBass = audioState.reactivity?.bass ?? 1.0
+    const rMid = audioState.reactivity?.mid ?? 1.0
+    const rHigh = audioState.reactivity?.high ?? 1.0
+
+    const reactiveScale = transforms.scale + (bass * rBass * 0.2) + lfoMods.scale
 
     uniformValues.uTransforms.value.set(
       transforms.x,
       transforms.y,
       reactiveScale,
-      transforms.rotation + (mid * audioState.reactivity.mid * 0.01) // slight rotation on mids
+      transforms.rotation + (mid * rMid * 0.01) + lfoMods.rotation
     )
 
     uniformValues.uShape.value = shape === 'circle' ? 1 : 0
     uniformValues.uSymEnabled.value = symmetry.enabled
     uniformValues.uSymSlices.value = symmetry.slices
+    const symTypeMap = { 'radial': 0, 'mirrorX': 1, 'mirrorY': 2 }
+    uniformValues.uSymType.value = symTypeMap[symmetry.type] || 0
+    uniformValues.uSymOffset.value = symmetry.offset || 0
 
     const warpMap = { 'none': 0, 'polar': 1, 'log-polar': 2 }
     uniformValues.uWarpType.value = warpMap[warp.type] || 0
@@ -177,13 +223,15 @@ function VisualizerScene() {
     const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
     uniformValues.uTilingType.value = tileMap[tiling.type] || 0
     // Tiling scale reactive to Highs?
-    // const reactiveTileScale = tiling.scale + (high * audioState.reactivity.high * 0.5)
+    // const reactiveTileScale = tiling.scale + (high * rHigh * 0.5)
     uniformValues.uTilingScale.value = tiling.scale
 
     uniformValues.uPosterize.value = color.posterize
+    uniformValues.uColorRGB.value.set(color.r, color.g, color.b)
+    uniformValues.uColorHSL.value.set(color.hue, color.sat, color.light)
 
     // Effects react to highs?
-    const reactiveMids = effects.solarize + (high * audioState.reactivity.high * 50)
+    const reactiveMids = effects.solarize + (high * rHigh * 50)
     uniformValues.uEffects.value.set(
       effects.edgeDetect,
       effects.invert,
@@ -191,59 +239,86 @@ function VisualizerScene() {
       effects.shift
     )
 
-    const genMap = { 'none': 0, 'fibonacci': 1, 'voronoi': 2, 'grid': 3 }
+    const genMap = { 'none': 0, 'fibonacci': 1, 'voronoi': 2, 'grid': 3, 'liquid': 4, 'plasma': 5, 'fractal': 6 }
+
     uniformValues.uGenType.value = genMap[generator.type] || 0
     uniformValues.uGenParams.value.set(generator.param1, generator.param2, generator.param3)
+
+    // Debug Generators
+    /* if (stateThree.clock.elapsedTime % 2 < 0.05) {
+       console.log("GenType:", generator.type, "uGenType:", uniformValues.uGenType.value, "uGenTime:", uniformValues.uGenTime.value.toFixed(2))
+    } */
   })
 
-  // Export Request Handler
+  // Export Request Handler (Safe RenderTarget Method)
   useEffect(() => {
     if (exportRequest) {
-      const { width, height, filename } = exportRequest
-      const uniformValues = uniforms
+      try {
+        const { width, height, filename } = exportRequest
 
-      // Force refresh uniforms for export frame
-      const { transforms, symmetry, warp, displacement, tiling, color, effects, generator } = useStore.getState()
-      uniformValues.uTransforms.value.set(transforms.x, transforms.y, transforms.scale, transforms.rotation)
-      uniformValues.uSymEnabled.value = symmetry.enabled
-      uniformValues.uSymSlices.value = symmetry.slices
-      const warpMap = { 'none': 0, 'polar': 1, 'log-polar': 2 }
-      uniformValues.uWarpType.value = warpMap[warp.type] || 0
-      uniformValues.uDisplacement.value.set(displacement.amp, displacement.freq)
-      const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
-      uniformValues.uTilingType.value = tileMap[tiling.type] || 0
-      uniformValues.uTilingScale.value = tiling.scale
-      uniformValues.uPosterize.value = color.posterize
-      uniformValues.uEffects.value.set(effects.edgeDetect, effects.invert, effects.solarize, effects.shift)
-      const genMap = { 'none': 0, 'fibonacci': 1, 'voronoi': 2, 'grid': 3 }
-      uniformValues.uGenType.value = genMap[generator.type] || 0
-      uniformValues.uGenParams.value.set(generator.param1, generator.param2, generator.param3)
+        // Create a RenderTarget
+        const rt = new THREE.WebGLRenderTarget(width, height, {
+          minFilter: THREE.LinearFilter,
+          magFilter: THREE.LinearFilter,
+          format: THREE.RGBAFormat
+        })
 
-      // Resize
-      const originalSize = new THREE.Vector2()
-      gl.getSize(originalSize)
-      gl.setSize(width, height)
-      uniformValues.uResolution.value.set(width, height)
-      uniformValues.uAspect.value = width / height
+        const uniformValues = uniforms // Current uniforms
 
-      // Render
-      gl.render(gl.scene, gl.camera)
+        // Resize Uniforms for Export
+        const originalResolution = uniformValues.uResolution.value.clone()
+        const originalAspect = uniformValues.uAspect.value
 
-      // Capture
-      gl.domElement.toBlob((blob) => {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        a.click()
-        URL.revokeObjectURL(url)
+        uniformValues.uResolution.value.set(width, height)
+        uniformValues.uAspect.value = width / height
 
-        // Reset
-        gl.setSize(originalSize.x, originalSize.y)
-        uniformValues.uResolution.value.set(originalSize.x, originalSize.y)
-        uniformValues.uAspect.value = originalSize.x / originalSize.y
-        triggerExport(null) // Clear request
-      }, 'image/png')
+        // Render to Target
+        gl.setRenderTarget(rt)
+        gl.render(gl.scene, gl.camera)
+        gl.setRenderTarget(null) // Back to screen
+
+        // Read Pixels
+        const buffer = new Uint8Array(width * height * 4)
+        gl.readRenderTargetPixels(rt, 0, 0, width, height, buffer)
+
+        // Flip Y (WebGL reads upside down)
+        const flippedBuffer = new Uint8Array(width * height * 4)
+        const stride = width * 4
+        for (let y = 0; y < height; y++) {
+          const srcRow = (height - 1 - y) * stride
+          const dstRow = y * stride
+          flippedBuffer.set(buffer.subarray(srcRow, srcRow + stride), dstRow)
+        }
+
+        // Convert to Blob (via temporary Canvas) - Safest for browser compatibility
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        const imageData = ctx.createImageData(width, height)
+        imageData.data.set(flippedBuffer)
+        ctx.putImageData(imageData, 0, 0)
+
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = filename
+          a.click()
+          URL.revokeObjectURL(url)
+          triggerExport(null)
+        }, 'image/png')
+
+        // Cleanup
+        rt.dispose()
+
+        // Restore Uniforms
+        uniformValues.uResolution.value.copy(originalResolution)
+        uniformValues.uAspect.value = originalAspect
+      } catch (err) {
+        console.error("Export Failed:", err)
+        triggerExport(null)
+      }
     }
   }, [exportRequest, gl, triggerExport, uniforms])
 
