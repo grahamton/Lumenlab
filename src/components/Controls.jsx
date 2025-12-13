@@ -584,7 +584,7 @@ export function Controls() {
           </button>
           <button
             onClick={() => {
-              if (confirm('Reset all parameters to default?')) store.resetParams()
+              store.resetParams()
             }}
             className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all"
             title="Reset Parameters (Soft Reset)"

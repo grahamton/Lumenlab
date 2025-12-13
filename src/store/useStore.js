@@ -455,6 +455,7 @@ export const useStore = create(
       // --- RESET ACTIONS ---
 
       // Soft Reset: Closes params but keeps global settings and timeline
+      // Soft Reset: Closes params but keeps global settings and timeline
       resetParams: () => {
         const { pushHistory } = get()
         pushHistory()
@@ -465,10 +466,13 @@ export const useStore = create(
           displacement: { ...DEFAULTS.displacement },
           masking: { ...DEFAULTS.masking },
           tiling: { ...DEFAULTS.tiling },
-          generator: { ...DEFAULTS.generator },
+          // Preserve the current generator type, but reset its parameters
+          generator: { ...DEFAULTS.generator, type: state.generator.type },
           color: { ...DEFAULTS.color },
           effects: { ...DEFAULTS.effects },
           flux: { ...DEFAULTS.flux },
+          lfo: { ...DEFAULTS.lfo },
+          audio: { ...DEFAULTS.audio },
           animation: { ...state.animation, isPlaying: false } // Stop playing but keep timeline
         }))
       },
