@@ -34,7 +34,7 @@ function VisualizerScene() {
 
   // Hooks
   const { isRecording, duration, startRecording, stopRecording } = useVideoRecorder(gl)
-  const { isReady: audioReady, getFrequencyData } = useAudioAnalyzer(audio.enabled, audio.source)
+  const { isReady: audioReady, getFrequencyData } = useAudioAnalyzer(audio.enabled, audio.source, audio.fileUrl)
 
   // ... (Video Recording UseEffects handled as before)
   useEffect(() => {
@@ -74,6 +74,11 @@ function VisualizerScene() {
     uDisplacement: { value: new THREE.Vector2(0, 10) },
     uTilingType: { value: 0 }, // 0=none
     uTilingScale: { value: 1 },
+    uTilingOverlap: { value: 0 }, // 0-1 blend between tiled/original UVs
+    uMaskThreshold: { value: 0 },
+    uMaskRadius: { value: 0 },
+    uMaskInvert: { value: 0 },
+    uMaskFeather: { value: 0 },
     uPosterize: { value: 256 },
     uColorRGB: { value: new THREE.Vector3(1, 1, 1) },
     uColorHSL: { value: new THREE.Vector3(0, 1, 1) },
@@ -134,7 +139,7 @@ function VisualizerScene() {
     const uniformValues = uniforms
     const {
       transforms, symmetry, warp, displacement, tiling,
-      color, effects, generator, audio: audioState, lfo, animation
+      masking, color, effects, generator, audio: audioState, lfo, animation, ui
     } = useStore.getState() // Access fresh state without re-render
 
     // Time Logic: Always translate global time
@@ -230,9 +235,8 @@ function VisualizerScene() {
 
     const tileMap = { 'none': 0, 'p1': 1, 'p2': 2, 'p4m': 3 }
     uniformValues.uTilingType.value = tileMap[tiling.type] || 0
-    // Tiling scale reactive to Highs?
-    // const reactiveTileScale = tiling.scale + (high * rHigh * 0.5)
     uniformValues.uTilingScale.value = tiling.scale
+    uniformValues.uTilingOverlap.value = tiling.overlap || 0
 
     uniformValues.uPosterize.value = color.posterize
     uniformValues.uColorRGB.value.set(color.r, color.g, color.b)
@@ -240,8 +244,10 @@ function VisualizerScene() {
 
     // Effects react to highs?
     const reactiveMids = effects.solarize + (high * rHigh * 50)
+    const perfCap = ui?.perfCapFx
+    const cappedEdge = perfCap ? Math.min(effects.edgeDetect || 0, 30) : effects.edgeDetect
     uniformValues.uEffects.value.set(
-      effects.edgeDetect,
+      cappedEdge,
       effects.invert,
       reactiveMids,
       effects.shift
@@ -251,6 +257,23 @@ function VisualizerScene() {
 
     uniformValues.uGenType.value = genMap[generator.type] || 0
     uniformValues.uGenParams.value.set(generator.param1, generator.param2, generator.param3)
+
+    // Masking uniforms
+    uniformValues.uMaskThreshold.value = masking.lumaThreshold || 0
+    uniformValues.uMaskRadius.value = masking.centerRadius || 0
+    uniformValues.uMaskInvert.value = masking.invertLuma ? 1 : 0
+    uniformValues.uMaskFeather.value = masking.feather || 0
+
+    // Audio meters to store (throttled)
+    const now = timeRef.current
+    if (audioState.enabled && audioReady && now - (timeRef.meterLast || 0) > 0.25) {
+      timeRef.meterLast = now
+      useStore.getState().setAudio('meters', {
+        bass: bass,
+        mid: mid,
+        high: high
+      })
+    }
 
     // Debug Generators
     /* if (stateThree.clock.elapsedTime % 2 < 0.05) {
@@ -346,7 +369,13 @@ function VisualizerScene() {
 }
 
 function EffectsLayer() {
-  const { bloom, chromaticAberration, noise } = useStore((state) => state.effects)
+  const perfCapFx = useStore((state) => state.ui?.perfCapFx)
+  const bloom = useStore((state) => state.effects.bloom)
+  const chromaticRaw = useStore((state) => state.effects.chromaticAberration)
+  const noiseRaw = useStore((state) => state.effects.noise)
+
+  const chromaticAberration = perfCapFx ? Math.min(chromaticRaw, 0.5) : chromaticRaw
+  const noise = perfCapFx ? Math.min(noiseRaw, 0.5) : noiseRaw
   return (
     <EffectComposer>
       {bloom > 0 && <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={bloom * 2} />}
@@ -358,6 +387,7 @@ function EffectsLayer() {
 
 export function CanvasGL() {
   const { canvas } = useStore()
+  const lowResPreview = useStore((state) => state.ui.lowResPreview)
 
   // Calculate viewport style (Letterboxing)
   const style = useMemo(() => {
@@ -382,6 +412,7 @@ export function CanvasGL() {
             antialias: false,
             powerPreference: "high-performance"
           }}
+          dpr={lowResPreview ? 0.75 : undefined}
           camera={{ position: [0, 0, 1] }}
         >
           <VisualizerScene />

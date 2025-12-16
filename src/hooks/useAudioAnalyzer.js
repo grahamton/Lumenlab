@@ -1,10 +1,11 @@
 import { useRef, useEffect, useState } from 'react'
 
-export function useAudioAnalyzer(enabled, source = 'mic') {
+export function useAudioAnalyzer(enabled, source = 'mic', fileUrl = null) {
   const audioContextRef = useRef(null)
   const analyserRef = useRef(null)
   const sourceNodeRef = useRef(null)
   const dataArrayRef = useRef(null)
+  const audioElementRef = useRef(null)
   // We use a ref for the bands to avoid re-renders, components can poll this or we can return it.
   const bandsRef = useRef({ low: 0, mid: 0, high: 0 })
   const [isReady, setIsReady] = useState(false)
@@ -15,6 +16,10 @@ export function useAudioAnalyzer(enabled, source = 'mic') {
         audioContextRef.current.close()
         audioContextRef.current = null
         setIsReady(false)
+      }
+      if (audioElementRef.current) {
+        audioElementRef.current.pause()
+        audioElementRef.current = null
       }
       return
     }
@@ -32,14 +37,27 @@ export function useAudioAnalyzer(enabled, source = 'mic') {
         if (source === 'mic') {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
           sourceNode = ctx.createMediaStreamSource(stream)
+        } else if (source === 'file') {
+          if (!fileUrl) {
+            console.warn("Audio file source selected but no fileUrl provided.")
+            return
+          }
+          const audioEl = new Audio(fileUrl)
+          audioEl.loop = true
+          audioEl.crossOrigin = 'anonymous'
+          // Autoplay can be blocked; play best-effort
+          audioEl.play().catch(() => {
+            console.warn("Audio autoplay blocked; user interaction may be required.")
+          })
+          sourceNode = ctx.createMediaElementSource(audioEl)
+          audioElementRef.current = audioEl
         } else {
-          // File logic would go here, separate handling usually.
-          // For now, let's just support MIC.
-          console.warn("File source not fully implemented in hook yet.")
+          console.warn("Unknown audio source:", source)
           return
         }
 
         sourceNode.connect(analyser)
+        sourceNodeRef.current = sourceNode
         // Note: Do NOT connect to destination (speakers) for Mic, or feedback loop!
 
         audioContextRef.current = ctx
@@ -60,8 +78,12 @@ export function useAudioAnalyzer(enabled, source = 'mic') {
       if (sourceNodeRef.current) sourceNodeRef.current.disconnect()
       if (analyserRef.current) analyserRef.current.disconnect()
       if (audioContextRef.current) audioContextRef.current.close()
+      if (audioElementRef.current) {
+        audioElementRef.current.pause()
+        audioElementRef.current = null
+      }
     }
-  }, [enabled, source])
+  }, [enabled, source, fileUrl])
 
   const getFrequencyData = () => {
     if (!analyserRef.current || !dataArrayRef.current) return { low: 0, mid: 0, high: 0 }

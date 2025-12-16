@@ -9,7 +9,7 @@ export const presets = [
       masking: { lumaThreshold: 10, centerRadius: 0, invertLuma: false, feather: 0.2 },
       tiling: { type: 'p4m', scale: 1.0, overlap: 0.0 },
       color: { posterize: 8 },
-      effects: { edgeDetect: 80, invert: 100, solarize: 0, shift: 50, bloom: 0.4, chromaticAberration: 0.2, noise: 0 },
+      effects: { edgeDetect: 50, invert: 100, solarize: 0, shift: 50, bloom: 0.4, chromaticAberration: 0.2, noise: 0 },
       generator: { type: 'fibonacci', param1: 50, param2: 50, param3: 50 }
     }
   },
@@ -51,7 +51,7 @@ export const presets = [
       masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false, feather: 0.1 },
       tiling: { type: 'none', scale: 1.0, overlap: 0.0 },
       color: { posterize: 256 },
-      effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 20, bloom: 0.2, chromaticAberration: 0.8, noise: 0.25 },
+      effects: { edgeDetect: 0, invert: 0, solarize: 0, shift: 20, bloom: 0.2, chromaticAberration: 0.6, noise: 0.25 },
       generator: { type: 'plasma', param1: 20, param2: 80, param3: 50 }
     }
   },
@@ -121,7 +121,7 @@ export const presets = [
       masking: { lumaThreshold: 0, centerRadius: 0, invertLuma: false, feather: 0 },
       tiling: { type: 'p2', scale: 1.0, overlap: 0 },
       color: { posterize: 4 },
-      effects: { edgeDetect: 80, invert: 0, solarize: 80, shift: 100, bloom: 0, chromaticAberration: 1.0, noise: 0.5 },
+      effects: { edgeDetect: 50, invert: 0, solarize: 80, shift: 100, bloom: 0, chromaticAberration: 0.7, noise: 0.5 },
       generator: { type: 'grid', param1: 90, param2: 50, param3: 50 }
     }
   },

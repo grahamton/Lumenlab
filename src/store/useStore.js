@@ -2,7 +2,10 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { CONTROLS } from '../config/uiConfig'
 
+const SCHEMA_VERSION = 2
+
 const DEFAULTS = {
+  schemaVersion: SCHEMA_VERSION,
   image: null,
   transforms: {
     x: 0,
@@ -35,7 +38,7 @@ const DEFAULTS = {
     overlap: 0.0,
   },
   generator: {
-    type: 'voronoi',
+    type: 'none',
     param1: 50,
     param2: 50,
     param3: 50,
@@ -88,12 +91,15 @@ const DEFAULTS = {
   audio: {
     enabled: false,
     source: 'mic',
+    fileUrl: null,
+    fileName: null,
     sensitivity: 1.0,
     reactivity: {
       bass: 1.0,
       mid: 1.0,
       high: 1.0,
-    }
+    },
+    meters: { bass: 0, mid: 0, high: 0 },
   },
   midi: {
     isEnabled: false,
@@ -112,6 +118,10 @@ const DEFAULTS = {
     resumeOnStartup: true, // New Preference: Default to TRUE
     midiLearnActive: false,
     midiLearnId: null, // The parameter path waiting for MIDI input
+    resetNotice: null,
+    lowResPreview: false,
+    perfCapFx: false,
+    lockGeometry: false,
   },
   recording: { isActive: false, progress: 0 },
   history: [],
@@ -327,16 +337,19 @@ export const useStore = create(
         snapshots: state.snapshots.filter((_, i) => i !== index)
       })),
 
-      loadSnapshot: (snap) => set({
-        transforms: { ...snap.transforms },
-        symmetry: { ...snap.symmetry },
-        warp: { ...snap.warp },
-        displacement: { ...snap.displacement },
-        tiling: { ...snap.tiling },
-        masking: { ...snap.masking },
-        color: { ...snap.color },
-        effects: { ...snap.effects },
-        generator: { ...snap.generator },
+      loadSnapshot: (snap) => set((state) => {
+        const lock = state.ui?.lockGeometry
+        return {
+          transforms: lock ? state.transforms : { ...snap.transforms },
+          symmetry: lock ? state.symmetry : { ...snap.symmetry },
+          warp: lock ? state.warp : { ...snap.warp },
+          displacement: { ...snap.displacement },
+          tiling: lock ? state.tiling : { ...snap.tiling },
+          masking: { ...snap.masking },
+          color: { ...snap.color },
+          effects: { ...snap.effects },
+          generator: { ...snap.generator },
+        }
       }),
 
       saveUserPreset: (name) => set((state) => {
@@ -498,6 +511,7 @@ export const useStore = create(
       name: 'lumen-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        schemaVersion: state.schemaVersion,
         transforms: state.transforms,
         symmetry: state.symmetry,
         warp: state.warp,
@@ -516,20 +530,33 @@ export const useStore = create(
         ui: state.ui,
         midi: state.midi, // Persist MIDI mappings
       }),
-      merge: (persistedState, currentState) => ({
-        ...currentState,
-        ...persistedState,
-        // Deep merge config objects to ensure new keys appear if schema changes
-        effects: { ...currentState.effects, ...(persistedState?.effects || {}) },
-        audio: { ...currentState.audio, ...(persistedState?.audio || {}) },
-        flux: { ...currentState.flux, ...(persistedState?.flux || {}) },
-        ui: { ...currentState.ui, ...(persistedState?.ui || {}) },
-        midi: { ...currentState.midi, ...(persistedState?.midi || {}) },
-        animation: { ...currentState.animation, ...(persistedState?.animation || {}) },
-        symmetry: { ...currentState.symmetry, ...(persistedState?.symmetry || {}) },
-        generator: { ...currentState.generator, ...(persistedState?.generator || {}) },
-        color: { ...currentState.color, ...(persistedState?.color || {}) },
-      }),
+      merge: (persistedState, currentState) => {
+        const incomingVersion = persistedState?.schemaVersion
+        if (incomingVersion !== SCHEMA_VERSION) {
+          localStorage.removeItem('lumen-storage')
+          return {
+            ...currentState,
+            schemaVersion: SCHEMA_VERSION,
+            ui: { ...currentState.ui, resetNotice: 'State reset after update' }
+          }
+        }
+
+        return {
+          ...currentState,
+          ...persistedState,
+          schemaVersion: SCHEMA_VERSION,
+          // Deep merge config objects to ensure new keys appear if schema changes
+          effects: { ...currentState.effects, ...(persistedState?.effects || {}) },
+          audio: { ...currentState.audio, ...(persistedState?.audio || {}) },
+          flux: { ...currentState.flux, ...(persistedState?.flux || {}) },
+          ui: { ...currentState.ui, ...(persistedState?.ui || {}) },
+          midi: { ...currentState.midi, ...(persistedState?.midi || {}) },
+          animation: { ...currentState.animation, ...(persistedState?.animation || {}) },
+          symmetry: { ...currentState.symmetry, ...(persistedState?.symmetry || {}) },
+          generator: { ...currentState.generator, ...(persistedState?.generator || {}) },
+          color: { ...currentState.color, ...(persistedState?.color || {}) },
+        }
+      },
     }
   )
 )

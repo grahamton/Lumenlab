@@ -7,6 +7,10 @@ uniform float uGenTime; // New: Generator specific time
 uniform float uAspect; // Canvas Aspect Ratio
 uniform float uImageAspect; // Image Aspect Ratio
 uniform float uShape; // 0=Rect, 1=Circle
+uniform float uMaskThreshold; // 0-100
+uniform float uMaskRadius; // 0-100 (percent of frame)
+uniform float uMaskInvert; // bool as float
+uniform float uMaskFeather; // 0-1
 
 // Transforms
 uniform vec4 uTransforms; // x, y, scale, rotation
@@ -24,6 +28,7 @@ uniform vec2 uDisplacement; // amp, freq
 // Tiling
 uniform float uTilingType; // 0=none, 1=p1-grid, 2=p2-spin, 3=p4m-mirror
 uniform float uTilingScale;
+uniform float uTilingOverlap; // 0-1 blend to center UV
 
 // Color & Effects
 uniform float uPosterize;
@@ -243,6 +248,7 @@ vec4 getContent(vec2 uv) {
 // --- MAIN ---
 void main() {
     vec2 uv = vUv;
+    vec2 uvOriginal = uv;
 
     // 1. Tiling Logic (Modify UVs first)
     // ... (Keep existing tiling logic structure, just abstracting sampling)
@@ -257,7 +263,7 @@ void main() {
         } else {
              tileUV = fract(tileUV);
         }
-        uv = tileUV; // Update the working UV
+        uv = mix(tileUV, uvOriginal, clamp(uTilingOverlap, 0.0, 1.0)); // Update the working UV with optional overlap blend
     }
 
     // 2. Coordinates centering
@@ -331,6 +337,28 @@ void main() {
     vec4 texColor = getContent(coord);
     vec3 color = texColor.rgb;
 
+    // Masking based on luma and optional radial mask
+    float mask = 1.0;
+    float lumaThresh = clamp(uMaskThreshold * 0.01, 0.0, 1.0); // normalize 0-100
+    float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+    if (lumaThresh > 0.0) {
+        mask *= smoothstep(lumaThresh, lumaThresh + 0.05, luma); // small softness
+    }
+    if (uMaskRadius > 0.0) {
+        vec2 cUV = coord - vec2(0.5);
+        cUV.x *= uAspect;
+        float r = length(cUV);
+        float radius = uMaskRadius * 0.01; // percent of frame
+        float feather = clamp(uMaskFeather, 0.0, 1.0) * 0.25; // up to 25% softness
+        float ring = 1.0 - smoothstep(radius - feather, radius + feather, r);
+        mask *= ring;
+    }
+    if (uMaskInvert > 0.5) {
+        mask = 1.0 - mask;
+    }
+    texColor.a *= mask;
+    color *= mask;
+
     // --- COLOR GRADING (RGB & HSL) ---
 
     // 1. RGB Balance
@@ -358,6 +386,25 @@ void main() {
         float b = getContent(coord + vec2(shiftValue, 0.0)).b;
         color.r = r;
         color.b = b;
+    }
+
+    // Edge Detect (Sobel)
+    if (uEffects.x > 0.0) {
+        vec2 texel = 1.0 / uResolution.xy;
+        float tl = dot(getContent(coord + texel * vec2(-1.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float t  = dot(getContent(coord + texel * vec2(0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float tr = dot(getContent(coord + texel * vec2(1.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float l  = dot(getContent(coord + texel * vec2(-1.0, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float r  = dot(getContent(coord + texel * vec2(1.0, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float bl = dot(getContent(coord + texel * vec2(-1.0, -1.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float b  = dot(getContent(coord + texel * vec2(0.0, -1.0)).rgb, vec3(0.299, 0.587, 0.114));
+        float br = dot(getContent(coord + texel * vec2(1.0, -1.0)).rgb, vec3(0.299, 0.587, 0.114));
+
+        float gx = -tl - 2.0 * l - bl + tr + 2.0 * r + br;
+        float gy = -tl - 2.0 * t - tr + bl + 2.0 * b + br;
+        float edge = clamp(sqrt(gx * gx + gy * gy), 0.0, 1.0);
+        float edgeMix = clamp(uEffects.x * 0.01, 0.0, 1.0);
+        color = mix(color, vec3(edge), edgeMix);
     }
 
     // Invert

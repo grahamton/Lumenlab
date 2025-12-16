@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { CONTROLS } from '../config/uiConfig'
 import { useStore } from '../store/useStore'
 import { CubeIcon, GridIcon, EyeIcon, SlidersIcon } from './Icons'
-import { Sliders, Activity, Monitor, Download, Maximize, RefreshCw, Layers, Zap, Undo2, RotateCcw, Power, Gamepad2, Pause, StopCircle, Play, Music, Sparkles, Settings } from 'lucide-react'
+import { Sliders, Activity, Monitor, Download, Maximize, RefreshCw, Layers, Zap, Undo2, RotateCcw, Power, Gamepad2, Pause, StopCircle, Play, Music, Sparkles, Settings, PauseCircle, PlayCircle } from 'lucide-react'
 
 // Minimal Control Components
 const ControlGroup = ({ label, value, min, max, onChange, step = 1, path }) => {
@@ -69,9 +69,11 @@ export function Controls() {
 
   // Local UI State
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   // Handlers for File Input
   const fileInputRef = useRef(null)
+  const audioFileRef = useRef(null)
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -94,6 +96,37 @@ export function Controls() {
   // Content for each Tab
 
   // TAB 0: SOURCE (Uploads, Generator Type, Generator Key Params)
+  const generatorPresets = {
+    fibonacci: [
+      { name: 'Tight Spiral', param1: 140, param2: 5, param3: 40 },
+      { name: 'Loose Bloom', param1: 60, param2: 20, param3: 10 },
+    ],
+    voronoi: [
+      { name: 'Soft Cells', param1: 30, param2: 80, param3: 10 },
+      { name: 'Cracked', param1: 90, param2: 20, param3: 50 },
+    ],
+    grid: [
+      { name: 'Micro Mesh', param1: 120, param2: 5, param3: 60 },
+      { name: 'Bold Lines', param1: 40, param2: 35, param3: 10 },
+    ],
+    liquid: [
+      { name: 'Slow Drift', param1: 30, param2: 15 },
+      { name: 'Fast Melt', param1: 80, param2: 70 },
+    ],
+    plasma: [
+      { name: 'Nebula', param1: 40, param2: 20 },
+      { name: 'Electric', param1: 80, param2: 80 },
+    ],
+    fractal: [
+      { name: 'Clouds', param1: 30, param2: 40, param3: 20 },
+      { name: 'Sharp Ice', param1: 90, param2: 80, param3: 60 },
+    ],
+  }
+
+  const applyGeneratorPreset = (preset) => {
+    Object.entries(preset).forEach(([key, val]) => store.setGenerator(key, val))
+  }
+
   const renderSource = () => (
     <div className="space-y-6">
       {/* Media Source */}
@@ -168,7 +201,7 @@ export function Controls() {
           <>
             <ControlGroup path="generator.param1" label="Spacing" value={store.generator.param1} min={10} max={200} onChange={(v) => store.setGenerator('param1', v)} />
             <ControlGroup path="generator.param2" label="Thickness" value={store.generator.param2} min={1} max={50} onChange={(v) => store.setGenerator('param2', v)} />
-            <ControlGroup path="generator.param3" label="Blur" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
+            <ControlGroup path="generator.param3" label="Softness" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
           </>
         )}
         {store.generator.type === 'liquid' && (
@@ -189,6 +222,24 @@ export function Controls() {
             <ControlGroup path="generator.param2" label="Detail" value={store.generator.param2} min={0} max={100} onChange={(v) => store.setGenerator('param2', v)} />
             <ControlGroup path="generator.param3" label="Turbulence" value={store.generator.param3} min={0} max={100} onChange={(v) => store.setGenerator('param3', v)} />
           </>
+        )}
+
+        {/* Quick presets per generator */}
+        {generatorPresets[store.generator.type] && (
+          <div className="mt-4 pt-3 border-t border-neutral-800">
+            <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">Quick Presets</label>
+            <div className="grid grid-cols-2 gap-2">
+              {generatorPresets[store.generator.type].map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => applyGeneratorPreset(p)}
+                  className="py-2 text-[10px] uppercase rounded border border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-cyan-700 hover:text-cyan-200 transition-colors"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -211,6 +262,22 @@ export function Controls() {
         <div className="flex items-center gap-2 text-xs text-purple-400 font-bold uppercase tracking-wider mb-4">
           <GridIcon size={12} /> Tiling
         </div>
+        <div className="flex gap-2 mb-2">
+          {[
+            { label: 'None', type: 'none', scale: 1 },
+            { label: 'Grid', type: 'p1', scale: 1 },
+            { label: 'Spin', type: 'p2', scale: 0.8 },
+            { label: 'Mirror', type: 'p4m', scale: 1.2 },
+          ].map(p => (
+            <button
+              key={p.label}
+              onClick={() => { store.setTiling('type', p.type); store.setTiling('scale', p.scale) }}
+              className={`flex-1 py-1 text-[10px] uppercase rounded border ${store.tiling.type === p.type ? 'bg-purple-900/30 text-purple-300 border-purple-800' : 'bg-neutral-800 text-neutral-500 border-neutral-800'}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
         <div className="mb-4">
           <div className="flex gap-1 mb-2">
             {['none', 'p1', 'p2', 'p4m'].map(m => (
@@ -230,6 +297,26 @@ export function Controls() {
       <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
         <div className="flex items-center gap-2 text-xs text-rose-400 font-bold uppercase tracking-wider mb-4">
           <RefreshCw size={12} /> Symmetry & Distortion
+        </div>
+        <div className="flex gap-2 mb-2">
+          {[
+            { label: 'Off', enabled: false, type: 'radial', slices: 6 },
+            { label: 'Radial 6', enabled: true, type: 'radial', slices: 6 },
+            { label: 'Mirror X', enabled: true, type: 'mirrorX', slices: store.symmetry.slices },
+            { label: 'Mirror Y', enabled: true, type: 'mirrorY', slices: store.symmetry.slices },
+          ].map(p => (
+            <button
+              key={p.label}
+              onClick={() => {
+                store.setSymmetry('enabled', p.enabled)
+                store.setSymmetry('type', p.type)
+                if (p.slices) store.setSymmetry('slices', p.slices)
+              }}
+              className={`flex-1 py-1 text-[9px] uppercase rounded border ${store.symmetry.enabled === p.enabled && store.symmetry.type === p.type ? 'bg-rose-900/30 text-rose-300 border-rose-800' : 'bg-neutral-800 text-neutral-500 border-neutral-800'}`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
         <Toggle label="Enable Symmetry" value={store.symmetry.enabled} onChange={(v) => store.setSymmetry('enabled', v)} />
 
@@ -264,6 +351,21 @@ export function Controls() {
         {/* Warp */}
         <div className="mt-4 pt-4 border-t border-neutral-800">
           <label className="text-[10px] text-neutral-500 font-bold uppercase mb-2 block">Warp Type</label>
+          <div className="flex gap-2 mb-2">
+            {[
+              { label: 'None', type: 'none' },
+              { label: 'Polar', type: 'polar' },
+              { label: 'Log Polar', type: 'log-polar' },
+            ].map(p => (
+              <button
+                key={p.type}
+                onClick={() => store.setWarp('type', p.type)}
+                className={`flex-1 py-1 text-[10px] uppercase rounded border ${store.warp.type === p.type ? 'bg-rose-900/30 text-rose-300 border-rose-800' : 'bg-neutral-800 text-neutral-500 border-transparent'}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-1 mb-2">
             {['none', 'polar', 'log-polar'].map(w => (
               <button
@@ -319,8 +421,74 @@ export function Controls() {
           </div>
           <Toggle label="" value={store.audio.enabled} onChange={(v) => store.setAudio('enabled', v)} />
         </div>
+        <div className="flex items-center gap-2 mb-3">
+          <label className="text-[10px] text-neutral-500 font-bold uppercase">Source</label>
+          <select
+            value={store.audio.source}
+            onChange={(e) => store.setAudio('source', e.target.value)}
+            className="flex-1 bg-neutral-800 text-[10px] text-neutral-300 p-1.5 rounded border border-neutral-700 outline-none focus:border-cyan-500"
+          >
+            <option value="mic">Microphone</option>
+            <option value="file">Audio File</option>
+          </select>
+        </div>
+        {store.audio.source === 'file' && (
+          <div className="flex flex-col gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => audioFileRef.current?.click()}
+                className="py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-[10px] uppercase font-bold rounded border border-neutral-700 text-neutral-300 transition-colors"
+              >
+                Load Audio
+              </button>
+              <span className="text-[10px] text-neutral-500 truncate flex-1">
+                {store.audio.fileName || 'No file selected'}
+              </span>
+              <input
+                ref={audioFileRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    const url = URL.createObjectURL(file)
+                    store.setAudio('fileUrl', url)
+                    store.setAudio('fileName', file.name)
+                  }
+                }}
+              />
+            </div>
+            {store.audio.fileUrl && (
+              <div className="flex items-center gap-2 text-[10px] text-neutral-400">
+                <button
+                  onClick={() => store.setAudio('enabled', !store.audio.enabled)}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-neutral-800 border border-neutral-700 hover:border-cyan-700 hover:text-cyan-200 transition-all"
+                >
+                  {store.audio.enabled ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                  {store.audio.enabled ? 'Pause' : 'Play'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {store.audio.enabled && (
           <ControlGroup path="audio.sensitivity" label="Sensitivity" step={0.1} value={store.audio.sensitivity} min={0.1} max={5.0} onChange={(v) => store.setAudio('sensitivity', v)} />
+        )}
+        {store.audio.enabled && (
+          <div className="flex gap-2 mt-2">
+            {['bass', 'mid', 'high'].map((band) => {
+              const val = store.audio.meters?.[band] ?? 0
+              return (
+                <div key={band} className="flex-1">
+                  <div className="text-[9px] uppercase text-neutral-500 mb-1">{band}</div>
+                  <div className="h-2 w-full bg-neutral-800 rounded">
+                    <div className="h-2 bg-pink-500 rounded" style={{ width: `${Math.min(val * 100, 100)}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 
@@ -330,13 +498,50 @@ export function Controls() {
           <Monitor size={12} /> Post Processing
         </div>
         <ControlGroup path="effects.bloom" label="Bloom" step={0.1} value={store.effects.bloom} min={0} max={3} onChange={(v) => store.setEffect('bloom', v)} />
-        <ControlGroup path="effects.chromaticAberration" label="Chromatic Aberration" value={store.effects.chromaticAberration} min={0} max={50} onChange={(v) => store.setEffect('chromaticAberration', v)} />
+        <ControlGroup path="effects.chromaticAberration" label="Chromatic Aberration" step={0.01} value={store.effects.chromaticAberration} min={0} max={1} onChange={(v) => store.setEffect('chromaticAberration', v)} />
         <ControlGroup path="effects.noise" label="Noise" step={0.01} value={store.effects.noise} min={0} max={1} onChange={(v) => store.setEffect('noise', v)} />
+      </div>
 
-        {/* Shader Effects (0-100) */}
-        <ControlGroup path="effects.invert" label="Invert" step={1} value={store.effects.invert} min={0} max={100} onChange={(v) => store.setEffect('invert', v)} />
-        <ControlGroup path="effects.solarize" label="Solarize" step={1} value={store.effects.solarize} min={0} max={100} onChange={(v) => store.setEffect('solarize', v)} />
-        <ControlGroup path="effects.shift" label="RGB Shift" step={1} value={store.effects.shift} min={0} max={100} onChange={(v) => store.setEffect('shift', v)} />
+      {/* Advanced FX & Masking */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-xs text-neutral-400 font-bold uppercase tracking-wider">
+            <Sliders size={12} /> Advanced (Masking / Edge / Extra FX)
+          </div>
+          <button
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+            className="text-[10px] uppercase px-2 py-1 rounded bg-neutral-800 text-neutral-300 border border-neutral-700 hover:border-cyan-700 hover:text-cyan-200 transition-all"
+          >
+            {advancedOpen ? 'Hide' : 'Show'}
+          </button>
+        </div>
+
+        {advancedOpen && (
+          <div className="space-y-4">
+            <div className="border border-neutral-800 rounded p-3 bg-black/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-neutral-500 font-bold uppercase">Masking</span>
+                <Toggle label="" value={store.masking.invertLuma} onChange={(v) => store.setMasking('invertLuma', v)} />
+              </div>
+              <ControlGroup path="masking.lumaThreshold" label="Luma Threshold" step={1} value={store.masking.lumaThreshold} min={0} max={60} onChange={(v) => store.setMasking('lumaThreshold', v)} />
+              <ControlGroup path="masking.centerRadius" label="Center Radius" step={1} value={store.masking.centerRadius} min={0} max={60} onChange={(v) => store.setMasking('centerRadius', v)} />
+              <ControlGroup path="masking.feather" label="Feather" step={0.01} value={store.masking.feather} min={0} max={0.5} onChange={(v) => store.setMasking('feather', v)} />
+            </div>
+
+            <div className="border border-neutral-800 rounded p-3 bg-black/20">
+              <span className="text-[10px] text-neutral-500 font-bold uppercase block mb-2">Extra FX</span>
+              <ControlGroup path="effects.edgeDetect" label="Edge Detect" step={1} value={store.effects.edgeDetect} min={0} max={50} onChange={(v) => store.setEffect('edgeDetect', v)} />
+              <ControlGroup path="effects.invert" label="Invert" step={1} value={store.effects.invert} min={0} max={100} onChange={(v) => store.setEffect('invert', v)} />
+              <ControlGroup path="effects.solarize" label="Solarize" step={1} value={store.effects.solarize} min={0} max={100} onChange={(v) => store.setEffect('solarize', v)} />
+              <ControlGroup path="effects.shift" label="RGB Shift" step={1} value={store.effects.shift} min={0} max={100} onChange={(v) => store.setEffect('shift', v)} />
+            </div>
+
+            <div className="border border-neutral-800 rounded p-3 bg-black/20">
+              <span className="text-[10px] text-neutral-500 font-bold uppercase block mb-2">Tiling Overlap</span>
+              <ControlGroup path="tiling.overlap" label="Overlap Blend" step={0.01} value={store.tiling.overlap} min={0} max={1} onChange={(v) => store.setTiling('overlap', v)} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -408,6 +613,21 @@ export function Controls() {
 
         </div>
 
+      </div>
+
+      {/* Performance */}
+      <div className="bg-neutral-900/50 p-3 rounded border border-neutral-800/50">
+        <div className="flex items-center gap-2 text-xs text-green-400 font-bold uppercase tracking-wider mb-4">
+          <Monitor size={12} /> Performance
+        </div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] text-neutral-500 font-bold uppercase">Low-res Preview</span>
+          <Toggle label="" value={store.ui.lowResPreview} onChange={(v) => setUi('lowResPreview', v)} />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-neutral-500 font-bold uppercase">Cap Heavy FX</span>
+          <Toggle label="" value={store.ui.perfCapFx} onChange={(v) => setUi('perfCapFx', v)} />
+        </div>
       </div>
 
       {/* Animation & Sequencer */}
@@ -525,6 +745,10 @@ export function Controls() {
                 <span className="text-[9px] text-neutral-400 font-bold uppercase">Safety</span>
               </div>
             </div>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-neutral-500 font-bold uppercase bg-neutral-900 p-2 rounded border border-neutral-800">
+            <span>Lock Geometry (snapshots)</span>
+            <Toggle label="" value={store.ui.lockGeometry} onChange={(v) => setUi('lockGeometry', v)} />
           </div>
         </div>
       </div>
@@ -716,6 +940,13 @@ export function Controls() {
           </div>
         )}
       </div>
+
+      {/* Reset notice */}
+      {ui.resetNotice && (
+        <div className="px-3 py-2 text-[10px] bg-amber-900/30 text-amber-200 border-b border-amber-800">
+          {ui.resetNotice}
+        </div>
+      )}
 
       {/* Tab Bar */}
       <div className={`flex items-center justify-around p-2 ${!isFloating && 'border-b border-neutral-900 bg-neutral-950'}`}>

@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { CanvasGL } from './components/CanvasGL'
+import { lazy, Suspense, useEffect } from 'react'
 import { Controls } from './components/Controls'
 import { HelpModal } from './components/HelpModal'
 import { useAnimator } from './hooks/useAnimator'
@@ -8,6 +7,8 @@ import { useStore } from './store/useStore'
 import { midiManager } from './core/MidiManager'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
+
+const LazyCanvas = lazy(() => import('./components/CanvasGL').then(mod => ({ default: mod.CanvasGL })))
 
 function App() {
   useAnimator() // Hook for physics/animation loop (updates store)
@@ -29,13 +30,6 @@ function App() {
       state.resetAll()
       window.location.reload()
       return
-    }
-
-    // UX: If loaded state is blank (No Image + No Generator), force a generator
-    // This fixes "Blank image on load" for users with empty persisted state
-    if (!state.image && state.generator.type === 'none') {
-      console.log("Blank State Detected: auto-enabling Voronoi")
-      state.setGenerator('type', 'voronoi')
     }
 
     midiManager.init()
@@ -78,9 +72,20 @@ function App() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white">
       <ErrorBoundary fallback={<div className="absolute inset-0 flex items-center justify-center text-red-500 font-mono text-xs">Canvas Error - Recovering...</div>}>
-        <CanvasGL />
+        <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-neutral-500 font-mono text-xs">Loading viewer...</div>}>
+          <LazyCanvas />
+        </Suspense>
       </ErrorBoundary>
       <Controls />
+      {/* Blank state helper */}
+      {!useStore((state) => state.image || (state.generator?.type && state.generator.type !== 'none')) && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="bg-black/60 border border-white/10 rounded-xl px-6 py-4 text-center max-w-xs">
+            <div className="text-sm font-semibold text-white mb-1">Start creating</div>
+            <div className="text-xs text-neutral-400">Upload an image/video or pick a generator to begin.</div>
+          </div>
+        </div>
+      )}
       {/* Floating Toggle Button (Visible when UI hidden) */}
       {!useStore((state) => state.ui.controlsOpen) && (
         <button
